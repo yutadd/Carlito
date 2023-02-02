@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-static VERSION: Lazy<String>=Lazy::new(|| String::from("0.0.0.5"));         //count of Release.BetaRelease.DevRelease.Commit
+static VERSION: Lazy<String>=Lazy::new(|| String::from("0.0.0.6"));         //count of Release.BetaRelease.DevRelease.Commit
 static NETWORK: Lazy<String>=Lazy::new(|| String::from("seed.yutadd.com")); //IP of dns seed
 mod mods;
 fn main() {
