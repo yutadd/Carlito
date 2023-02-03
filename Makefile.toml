@@ -3,3 +3,15 @@
 # ビルドの流れ
 # 第一に、目標はルートディレクトリの実行ファイルを実行することでそのままノードを起動できるようにする。
 # そのために、ルートディレクトリに実行可能ファイルを生成し、Blocksディレクトリもルート直下に置く。
+[tasks.build]
+script=['''
+#!/usr/bin/env bash
+cd source
+cargo build
+cp target/debug/poa_block_chain.exe ../
+''']
+[tasks.run]
+script=['''
+#!/usr/bin/env bash
+./poa_block_chain.exe
+''']

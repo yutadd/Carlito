@@ -1,8 +1,8 @@
 use secp256k1::{Secp256k1, Message,SecretKey, PublicKey};
-use std::{str::FromStr, ptr::null_mut};
+use std::{str::FromStr, ptr::null_mut, fmt::format};
 use rand::rngs::OsRng;
 use once_cell::sync::Lazy;
-pub static SECRET:Option<Lazy<SecretKey>>=None;
+pub static SECRET:Vec<Lazy<SecretKey>>=Vec::new();
 /*  
     implements later from https://github.com/rust-bitcoin/rust-secp256k1/blob/master/examples/sign_verify_recovery.rs
     and https://docs.rs/secp256k1/latest/secp256k1/ 
@@ -23,11 +23,11 @@ fn add_new_key(){
     append_key_to_file(secret_key)
 }
 fn read_key_from_file()->Vec<SecretKey>{
+    
     let key = SecretKey::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
     Vec::new()
 }
 fn append_key_to_file(key:SecretKey){
-    println!("let me convert");
-    assert_eq!(key,SecretKey::from_slice(&key.secret_bytes()).expect("OMG this is not convertible!"));
-    println!("did i done successfully?");
+    let secret_str=format!("{}\n",key.display_secret());
+    
 }
