@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use secp256k1::{Secp256k1, Message, PublicKey, SecretKey, ecdsa::Signature};
 use secp256k1::hashes::{sha256};
 use std::{str::FromStr, };
-use crate::mods::util::system;
+use crate::mods::certification::key_agent;
 use std::fs::{OpenOptions};
 use secp256k1::All;
 use std::io::{prelude::*,BufReader};
@@ -48,4 +48,22 @@ pub fn is_host_trusted(x_only_public_key:String)->bool{
         }
     }
     exists
+}
+#[test]
+fn sign_util_init(){
+    init();
+}
+#[test]
+fn sign_util_trusted_host(){
+    init();
+    assert!(is_host_trusted("f0cd5f5b47d983c4c5c173444e577bcffda3884f6f53b03cf5f97b5ed25d692f".to_string()));
+}
+#[test]
+fn sign_util_verify(){
+    key_agent::init();
+    let sign=create_sign("HelloWorld".to_string(), *key_agent::get_key(0).unwrap());
+    println!("{}",sign);
+    println!("{}",verify_sign("HelloWorld".to_string(), sign.to_string(), key_agent::get_key(0).unwrap().public_key(&SECP)));
+    println!("{}",verify_sign("HelloWorld01".to_string(), sign.to_string(), key_agent::get_key(0).unwrap().public_key(&SECP)));
+    println!("end_test_signeture");
 }

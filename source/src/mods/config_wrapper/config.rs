@@ -1,9 +1,24 @@
-
-#[derive(Debug)]
+extern crate yaml_rust;
+use yaml_rust::{YamlLoader, YamlEmitter};
+use std::fs;
 pub struct Elements{
-    network:String,
+    pub network:String,
+    pub version:String,
 }
-
+impl Elements {
+    pub fn new() -> Self {
+        Self { network:"seed.yutadd.com".to_string() , version: "0.0.0.16".to_string() }
+    }
+}
 pub fn init()->Elements{
-    Elements{network:"seed.yutadd.com".to_string()}
+    let s=fs::read_to_string("Config/config.yml").unwrap();
+    let doc = YamlLoader::load_from_str(&s).unwrap();
+    let doc=&doc[0];
+    let elm=Elements{
+        network:doc["network"].as_str().unwrap().to_string(),
+        version:"0.0.0.17".to_string()
+    };
+    elm
+    // Test
+    //assert_eq!(doc["foo"][0].as_str().unwrap(), "list1");
 }

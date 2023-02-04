@@ -22,14 +22,13 @@ static mut SECRET:Vec<SecretKey>=Vec::new();
     }
     unsafe{
         read_key_from_file(f);
+        assert!(SECRET.len()>0);
     }
     
 }
 fn create_new_key(){
     let secp = Secp256k1::new();
     let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
-    println!("{:?}",secret_key.display_secret());
-    println!("{:?}",public_key.serialize());
     append_key_to_file(secret_key);
 }
 unsafe fn read_key_from_file(file:File){
@@ -42,7 +41,6 @@ unsafe fn read_key_from_file(file:File){
             Ok(sec)=>sec,
             Err(e)=>{system::exit_with_error(e.to_string());SecretKey::from_str("0x0a").unwrap()}//１つ目の命令でプロセスが終了するため、２個めの命令は実行されません。
         };
-        println!("readed_pubkey:{}",key.public_key(&secp).x_only_public_key().0.to_string());
         svec.push(key);
     }
     for _ in 0..svec.len(){
@@ -69,5 +67,12 @@ pub fn get_key(index:usize)->Option<&'static SecretKey>{
 pub fn get_key_length()->usize{
     unsafe{
         SECRET.len()
+    }
+}
+#[test]
+fn key_agent_init(){
+    init();
+    for i in 0..(get_key_length()){
+        println!("{}",get_key(i).unwrap().display_secret());
     }
 }
