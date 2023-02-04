@@ -58,9 +58,10 @@ fn sign_util_trusted_host(){
     init();
     assert!(is_host_trusted("f0cd5f5b47d983c4c5c173444e577bcffda3884f6f53b03cf5f97b5ed25d692f".to_string()));
 }
-use crate::mods::certification::key_agent;
+
 #[test]
 fn sign_util_verify(){
+    use crate::mods::certification::key_agent;
     key_agent::init();
     let sign=create_sign("HelloWorld".to_string(), *key_agent::get_key(0).unwrap());
     println!("{}",sign);

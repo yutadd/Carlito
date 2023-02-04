@@ -16,6 +16,7 @@ fn main() {
         CONFIG=OnceCell::from(Mutex::new(config::init()));
     }
     println!("Inited");
+
 }
 fn get_config()->MutexGuard<'static, Elements, >{
     unsafe{
