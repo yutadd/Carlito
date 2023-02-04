@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "bitcoin_hashes"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90064b8dee6815a6470d60bad07bbbaee885c0e12d04177138fa3291a01b7bc4"
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -94,6 +100,7 @@ name = "secp256k1"
 version = "0.26.0"
 source = "git+https://github.com/rust-bitcoin/rust-secp256k1/#8603719a936e4092ae014051b03347c77e8e6b99"
 dependencies = [
+ "bitcoin_hashes",
  "rand",
  "secp256k1-sys",
 ]

@@ -1,6 +1,6 @@
 use secp256k1::{Secp256k1, SecretKey, };
 use std::{str::FromStr, path::Path};
-use rand::{rngs::OsRng, Error};
+use rand::{rngs::OsRng};
 use std::fs::{File,OpenOptions};
 use crate::mods::util::system;
 use std::io::{prelude::*,BufReader,Write};
@@ -33,6 +33,7 @@ fn create_new_key(){
     append_key_to_file(secret_key);
 }
 unsafe fn read_key_from_file(file:File){
+    let secp = Secp256k1::new();
     let mut svec:Vec<SecretKey>=  Vec::new();
     let reader = BufReader::new(file);
     for line in reader.lines() {
@@ -41,6 +42,7 @@ unsafe fn read_key_from_file(file:File){
             Ok(sec)=>sec,
             Err(e)=>{system::exit_with_error(e.to_string());SecretKey::from_str("0x0a").unwrap()}//１つ目の命令でプロセスが終了するため、２個めの命令は実行されません。
         };
+        println!("readed_pubkey:{}",key.public_key(&secp).x_only_public_key().0.to_string());
         svec.push(key);
     }
     for _ in 0..svec.len(){
