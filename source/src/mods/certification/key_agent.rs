@@ -32,7 +32,6 @@ fn create_new_key(){
     append_key_to_file(secret_key);
 }
 unsafe fn read_key_from_file(file:File){
-    let secp = Secp256k1::new();
     let mut svec:Vec<SecretKey>=  Vec::new();
     let reader = BufReader::new(file);
     for line in reader.lines() {

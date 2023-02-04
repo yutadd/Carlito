@@ -9,17 +9,13 @@ pub static mut CONFIG: OnceCell<Mutex<config::Elements>>=OnceCell::new();       
 mod mods;
 
 fn main() {
-    
     println!("Initializing...");
     key_agent::init();
     sign_util::init();
     unsafe{
         CONFIG=OnceCell::from(Mutex::new(config::init()));
-        println!("unsafe config getter:{}",get_config().network);
     }
-    
     println!("Inited");
-    
 }
 fn get_config()->MutexGuard<'static, Elements, >{
     unsafe{
@@ -27,6 +23,6 @@ fn get_config()->MutexGuard<'static, Elements, >{
     }
 }
 #[test]
-fn test_main(){
+fn main_access_config(){
     println!("Hello, world!{}",get_config().version);
 }

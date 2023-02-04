@@ -1,5 +1,5 @@
 extern crate yaml_rust;
-use yaml_rust::{YamlLoader, YamlEmitter};
+use yaml_rust::{YamlLoader};
 use std::fs;
 pub struct Elements{
     pub network:String,
@@ -21,4 +21,8 @@ pub fn init()->Elements{
     elm
     // Test
     //assert_eq!(doc["foo"][0].as_str().unwrap(), "list1");
+}
+#[test]
+fn config_init(){
+    println!("unsafe config getter:{}",init().network);
 }
