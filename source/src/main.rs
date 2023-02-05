@@ -4,7 +4,10 @@ use mods::certification::key_agent;
 use mods::certification::sign_util;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
+use std::thread;
 use mods::config_wrapper::config;
+use mods::network::server;
+use std::io::stdin;
 pub static mut CONFIG: OnceCell<Mutex<config::Elements>>=OnceCell::new();         //count of Release.BetaRelease.DevRelease.Commit
 mod mods;
 
@@ -15,8 +18,16 @@ fn main() {
     unsafe{
         CONFIG=OnceCell::from(Mutex::new(config::init()));
     }
-    println!("Inited");
-
+    thread::spawn(||{
+        server::run();
+        println!("Inited");
+        
+    });
+    loop{
+        let mut line=&mut String::new();
+        stdin().read_line(line);
+        println!("your input:{}",line);
+    }
 }
 fn get_config()->MutexGuard<'static, Elements, >{
     unsafe{

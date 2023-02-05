@@ -4,7 +4,7 @@ use rand::{rngs::OsRng};
 use std::fs::{File,OpenOptions};
 use crate::mods::util::system;
 use std::io::{prelude::*,BufReader,Write};
-static mut SECRET:Vec<SecretKey>=Vec::new();
+pub static mut SECRET:Vec<SecretKey>=Vec::new();
 
 /*  
     implements later from https://github.com/rust-bitcoin/rust-secp256k1/blob/master/examples/sign_verify_recovery.rs
