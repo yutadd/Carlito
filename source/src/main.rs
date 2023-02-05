@@ -24,8 +24,8 @@ fn main() {
         
     });
     loop{
-        let mut line=&mut String::new();
-        stdin().read_line(line);
+        let line=&mut String::new();
+        stdin().read_line(line).unwrap();
         println!("your input:{}",line);
     }
 }

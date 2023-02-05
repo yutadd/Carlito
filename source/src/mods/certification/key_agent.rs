@@ -36,10 +36,7 @@ unsafe fn read_key_from_file(file:File){
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line.unwrap();
-        let key:SecretKey=match SecretKey::from_str(&line){
-            Ok(sec)=>sec,
-            Err(e)=>{system::exit_with_error(e.to_string());SecretKey::from_str("0x0a").unwrap()}//１つ目の命令でプロセスが終了するため、２個めの命令は実行されません。
-        };
+        let key:SecretKey=SecretKey::from_str(&line).unwrap();
         svec.push(key);
     }
     for _ in 0..svec.len(){
@@ -49,14 +46,8 @@ unsafe fn read_key_from_file(file:File){
 fn append_key_to_file(key:SecretKey){
     let mut f=OpenOptions::new().read(true).write(true).create(true).open(Path::new("secret/secret.txt")).unwrap();
     let secret_str=format!("{}\n",key.display_secret());
-    match f.write(secret_str.as_bytes()){
-        Err(e)=>system::exit_with_error(e.to_string()),
-        _=>{}
-    };
-    match f.flush(){
-        Err(e)=>system::exit_with_error(e.to_string()),
-        _=>{}
-    };
+    f.write(secret_str.as_bytes()).unwrap();
+    f.flush().unwrap();
 }
 pub fn get_key(index:usize)->Option<&'static SecretKey>{
     unsafe{
