@@ -1,8 +1,7 @@
 use once_cell::sync::Lazy;
 use secp256k1::{Secp256k1, Message, PublicKey, SecretKey, ecdsa::Signature};
 use secp256k1::hashes::{sha256};
-use std::{str::FromStr, };
-
+use std::{str::FromStr};
 use std::fs::{OpenOptions};
 use secp256k1::All;
 use std::io::{prelude::*,BufReader};

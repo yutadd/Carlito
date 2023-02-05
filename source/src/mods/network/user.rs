@@ -1,25 +1,20 @@
-use std::io::{Write, Read, BufRead};
+use std::io::{Write,BufRead};
 use std::{
     sync::Arc,
     thread
 };
-use std::{
-    io::BufReader,
-    net::{ TcpStream},
-    prelude::*,
-    task,
-};
+use std::{io::BufReader,net::{TcpStream}};
 pub struct User{
     pub user:Arc<TcpStream>
 }
 impl User{
     pub fn write(&self,context:String){
-        (&*self.user).write_all(context.as_bytes());
-        (&*self.user).flush();
+        (&*self.user).write_all(context.as_bytes()).unwrap();
+        (&*self.user).flush().unwrap();
     }
 }
 pub fn init(stream:Arc<TcpStream>)->User{
-    let mut stream2=Arc::clone(&stream);
+    let stream2=Arc::clone(&stream);
     thread::spawn(move ||{
         let mut reader = BufReader::new(&*stream2);
         println!("");
