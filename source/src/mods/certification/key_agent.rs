@@ -2,6 +2,7 @@ use secp256k1::{Secp256k1, SecretKey, };
 use std::{str::FromStr, path::Path};
 use rand::{rngs::OsRng};
 use std::fs::{File,OpenOptions};
+use std::fs;
 use crate::mods::util::system;
 use std::io::{prelude::*,BufReader,Write};
 pub static mut SECRET:Vec<SecretKey>=Vec::new();
@@ -13,10 +14,12 @@ pub static mut SECRET:Vec<SecretKey>=Vec::new();
 //create file or read file
  pub fn init(){
     let mut is_exst=false;
-    if Path::new("secret/secret.txt").exists() {
-        is_exst=true;
+    let f:File;
+    if !Path::new("secret/secret.txt").exists() {
+        fs::create_dir_all("secret/").unwrap();
+        is_exst=false;
     }
-    let f=OpenOptions::new().create(true).read(true).write(true).open("secret/secret.txt").unwrap();
+    f=OpenOptions::new().create(true).read(true).write(true).open("secret/secret.txt").unwrap();
     if !is_exst {
         create_new_key();
     }

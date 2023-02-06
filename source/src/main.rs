@@ -7,6 +7,7 @@ use std::sync::MutexGuard;
 use std::thread;
 use mods::config_wrapper::config;
 use mods::network::server;
+use mods::network::dns_seed;
 use std::io::stdin;
 pub static mut CONFIG: OnceCell<Mutex<config::Elements>>=OnceCell::new();         //count of Release.BetaRelease.DevRelease.Commit
 mod mods;
@@ -20,9 +21,11 @@ fn main() {
     }
     thread::spawn(||{
         server::run();
-        println!("Inited");
+        println!("thread-Inited");
         
     });
+    dns_seed::init();
+    println!("Inited");
     loop{
         let line=&mut String::new();
         stdin().read_line(line).unwrap();

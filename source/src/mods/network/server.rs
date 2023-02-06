@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 use super::user;
 use std::net::TcpListener;
-use super::user::User;
-pub static mut users:Lazy<Vec<User>>=Lazy::new(||Vec::new());
+use super::user::USERS;
+
 pub fn run(){
     let listener = TcpListener::bind("0.0.0.0:7777").expect("Error: Failed to bind");
     println!("Listening...");
@@ -11,8 +10,10 @@ pub fn run(){
         println!("connection incoming!");
         let streams=streams.unwrap();
         unsafe{
-            users.push(user::init(Arc::new(streams)));
-            for user in users.iter(){
+            let user=user::init(Arc::new(streams));
+            user.read_thread();
+            USERS.push(user);
+            for user in USERS.iter(){
                 user.write("Hi from rust\r\n".to_string());
             }
         }
