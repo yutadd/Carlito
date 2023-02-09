@@ -1,1 +1,7 @@
-network: seed.yutadd.com
+network: 
+  domain: seed.yutadd.com
+  bind-addr: 0.0.0.0
+  bind-port: 7777
+  dns: 
+    ip: 8.8.8.8
+    port: 53
