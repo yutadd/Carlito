@@ -23,7 +23,7 @@ pub fn run() {
             user.read_thread();
             UNTRUSTED_USERS.push(user);
             for user in UNTRUSTED_USERS.iter() {
-                user.write("Hi from rust\r\n".to_string());
+                //user.write("Hi from rust\r\n".to_string());
             }
         }
     }

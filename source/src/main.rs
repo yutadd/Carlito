@@ -51,7 +51,9 @@ DEV
 PoAはValidatorの人数がわかっているため、多数決も可能。
 多数決で過去のチェーンにロールバックすることもできる可能性がある。
 
-
+# TODO
+user.rsで認証の実装
+dockerでネットワークシュミレーションを行えるようにする。
 
 #ref
 ref1: https://morioh.com/p/de3cf10c2194
@@ -69,7 +71,10 @@ fn main() {
     println!("Inited");
     loop {
         let line = &mut String::new();
-        stdin().read_line(line).unwrap();
-        println!("your input:{}", line);
+        let size=stdin().read_line(line).unwrap();
+        if size>0{
+            println!("your input:{}", line);
+        }
+        
     }
 }

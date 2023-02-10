@@ -40,7 +40,7 @@ impl User {
                 } else {
                     let json_obj = json::parse(&line).unwrap();
                     if json_obj["type"].eq("hello") {
-                        println!("received secret is {}", json_obj["args"]["secret"]);
+                        println!("received pubk is {}", json_obj["args"]["pubk"]);
                     }
                 }
                 println!("{}", line);
@@ -60,7 +60,7 @@ pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> User {
             (&*stream)
                 .write_all(
                     format!(
-                        "{{\"type\":\"hello\",\"args\":{{\"secret\":\"{}\"}}}}\r\n",
+                        "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
                         key.to_string()
                     )
                     .as_bytes(),

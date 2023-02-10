@@ -1,3 +1,4 @@
+#![feature(catch_expr)]
 use super::super::config_wrapper::config;
 use super::user;
 use super::user::UNTRUSTED_USERS;
@@ -40,31 +41,74 @@ fn get_addr(name: String) -> Vec<Ipv4Addr> {
     v
 }
 pub fn init() {
-    let mut addrs = Vec::new();
+    let is_docker;
     unsafe {
-        addrs = get_addr(
-            config::YAML["network"]["domain"]
-                .as_str()
-                .unwrap()
-                .to_string(),
-        );
+        is_docker = config::YAML["docker"]["is-docker"].as_bool().unwrap();
     }
-    for addr in addrs {
-        unsafe {
-            if addr
-                .to_string()
-                .eq(config::YAML["network"]["own-ip"].as_str().unwrap())
-            {
-                continue;
+    if is_docker {
+        let hosts = Vec::from(["node01", "node02", "node03"]);
+        for addr in hosts {
+            unsafe {
+                if addr
+                    .to_string()
+                    .eq(config::YAML["docker"]["own-name"].as_str().unwrap())
+                {
+                    continue;
+                }
+            }
+            // TODO: 起動する順番によってはまだ接続できない場合があるから、そのための例外処理を行う
+            let connection: TcpStream;
+            match TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)) {
+                Ok(stream) => {
+                    connection = stream;
+                }
+                Err(error) => {
+                    println!("未接続:{}", error.kind());
+                    continue;
+                }
+            }
+
+            let _user = user::init(Arc::new(connection), false);
+            _user.read_thread();
+            unsafe {
+                UNTRUSTED_USERS.push(_user);
             }
         }
-        let _user = user::init(
-            Arc::new(TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)).unwrap()),
-            false,
-        );
-        _user.read_thread();
+    } else {
+        let mut addrs = Vec::new();
         unsafe {
-            UNTRUSTED_USERS.push(_user);
+            addrs = get_addr(
+                config::YAML["network"]["domain"]
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+        for addr in addrs {
+            unsafe {
+                if addr
+                    .to_string()
+                    .eq(config::YAML["network"]["own-ip"].as_str().unwrap())
+                {
+                    continue;
+                }
+            }
+            let connection: TcpStream;
+            match TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)) {
+                Ok(stream) => {
+                    connection = stream;
+                }
+                Err(error) => {
+                    println!("未接続:{}", error.kind());
+                    continue;
+                }
+            }
+
+            let _user = user::init(Arc::new(connection), false);
+            _user.read_thread();
+            unsafe {
+                UNTRUSTED_USERS.push(_user);
+            }
         }
     }
 
