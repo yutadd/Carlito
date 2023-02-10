@@ -1,7 +1,12 @@
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
 use once_cell::sync::Lazy;
+use rand::prelude::*;
+use secp256k1::ecdsa::Signature;
+use secp256k1::PublicKey;
+use secp256k1::XOnlyPublicKey;
 use std::io::{BufRead, Write};
+use std::str::FromStr;
 use std::sync::Mutex;
 use std::{io::BufReader, net::TcpStream};
 use std::{sync::Arc, thread};
@@ -12,7 +17,9 @@ pub struct Connection {
     pub isok: bool,
     pub id: u16,
     pub user: Arc<TcpStream>,
+    pub pubk: Option<PublicKey>,
     pub is_inbound: bool,
+    pub nonce: Option<String>,
 }
 impl Connection {
     pub fn read_thread(&self) {
@@ -29,18 +36,48 @@ impl Connection {
                     let mut remove = 0;
                     let _aru = false;
                     unsafe {
-                        for idx in 0..UNTRUSTED_USERS.len() {
-                            if UNTRUSTED_USERS[idx].id == id {
-                                remove = idx;
-                            }
-                        }
-                        UNTRUSTED_USERS.remove(remove);
+                        UNTRUSTED_USERS.remove(get_idx(id));
                     }
                     break;
                 } else {
                     let json_obj = json::parse(&line).unwrap();
                     if json_obj["type"].eq("hello") {
                         println!("received pubk is {}", json_obj["args"]["pubk"]);
+                        unsafe {
+                            UNTRUSTED_USERS[get_idx(id)].pubk = Option::Some(
+                                PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
+                                    .unwrap()
+                                    .clone(),
+                            );
+                            let mut rng = rand::thread_rng();
+                            let generated_rand = rng.next_u32();
+                            UNTRUSTED_USERS[get_idx(id)].write(format!(
+                                "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
+                                generated_rand
+                            ));
+                            UNTRUSTED_USERS[get_idx(id)].nonce =
+                                Option::Some(format!("{}", generated_rand));
+                        }
+                    } else if json_obj["type"].eq("req_sign") {
+                        unsafe {
+                            let sign = sign_util::create_sign(
+                                json_obj["args"]["nonce"].as_str().unwrap().to_string(),
+                                key_agent::SECRET[0],
+                            );
+                            UNTRUSTED_USERS[get_idx(id)].write(format!(
+                                "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
+                                sign.to_string()
+                            ));
+                        }
+                    } else if json_obj["type"].eq("signed") {
+                        unsafe {
+                            let verify_result = sign_util::verify_sign(
+                                UNTRUSTED_USERS[get_idx(id)].nonce.clone().unwrap(),
+                                json_obj["args"]["sign"].as_str().unwrap().to_string(),
+                                UNTRUSTED_USERS[get_idx(id)].pubk.unwrap(),
+                            );
+                            println!("verify result:{}", verify_result)
+                        }
                     }
                 }
                 println!("{}", line);
@@ -52,11 +89,23 @@ impl Connection {
         (&*self.user).flush().unwrap();
     }
 }
+fn get_idx(id: u16) -> usize {
+    unsafe {
+        for idx in 0..UNTRUSTED_USERS.len() {
+            if UNTRUSTED_USERS[idx].id == id {
+                return idx;
+            }
+        }
+        UNTRUSTED_USERS.len()
+    }
+}
 pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> Connection {
     *COUNT.lock().unwrap() += 1;
     if !is_inbound {
         unsafe {
-            let key = key_agent::SECRET[0].x_only_public_key(&sign_util::SECP).0;
+            let key = key_agent::SECRET[0]
+                .public_key(&sign_util::SECP)
+                .to_string();
             (&*stream)
                 .write_all(
                     format!(
@@ -73,7 +122,9 @@ pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> Connection {
         user: stream,
         id: *COUNT.lock().unwrap(),
         isok: true,
+        pubk: Option::None,
         is_inbound: is_inbound,
+        nonce: Option::None,
     }
 }
 #[test]
