@@ -1,7 +1,7 @@
 #![feature(catch_expr)]
 use super::super::config_wrapper::config;
-use super::user;
-use super::user::UNTRUSTED_USERS;
+use super::connection;
+use super::connection::UNTRUSTED_USERS;
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
 use std::net::TcpStream;
@@ -68,7 +68,7 @@ pub fn init() {
                 }
             }
 
-            let _user = user::init(Arc::new(connection), false);
+            let _user = connection::init(Arc::new(connection), false);
             _user.read_thread();
             unsafe {
                 UNTRUSTED_USERS.push(_user);
@@ -104,7 +104,7 @@ pub fn init() {
                 }
             }
 
-            let _user = user::init(Arc::new(connection), false);
+            let _user = connection::init(Arc::new(connection), false);
             _user.read_thread();
             unsafe {
                 UNTRUSTED_USERS.push(_user);

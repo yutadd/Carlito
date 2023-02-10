@@ -6,15 +6,15 @@ use std::sync::Mutex;
 use std::{io::BufReader, net::TcpStream};
 use std::{sync::Arc, thread};
 static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
-pub static mut UNTRUSTED_USERS: Lazy<Vec<User>> = Lazy::new(|| Vec::new());
-pub static mut TRUSTED_USERS: Lazy<Vec<User>> = Lazy::new(|| Vec::new());
-pub struct User {
+pub static mut UNTRUSTED_USERS: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
+pub static mut TRUSTED_USERS: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
+pub struct Connection {
     pub isok: bool,
     pub id: u16,
     pub user: Arc<TcpStream>,
     pub is_inbound: bool,
 }
-impl User {
+impl Connection {
     pub fn read_thread(&self) {
         let stream2 = Arc::clone(&self.user);
         let id = self.id;
@@ -52,7 +52,7 @@ impl User {
         (&*self.user).flush().unwrap();
     }
 }
-pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> User {
+pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> Connection {
     *COUNT.lock().unwrap() += 1;
     if !is_inbound {
         unsafe {
@@ -69,7 +69,7 @@ pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> User {
             (&*stream).flush().unwrap();
         }
     }
-    User {
+    Connection {
         user: stream,
         id: *COUNT.lock().unwrap(),
         isok: true,

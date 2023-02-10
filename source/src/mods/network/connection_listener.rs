@@ -1,6 +1,6 @@
 use super::super::config_wrapper::config::YAML;
-use super::user;
-use super::user::UNTRUSTED_USERS;
+use super::connection;
+use super::connection::UNTRUSTED_USERS;
 use std::net::TcpListener;
 use std::sync::Arc;
 
@@ -19,7 +19,7 @@ pub fn run() {
         println!("connection incoming!");
         let streams = streams.unwrap();
         unsafe {
-            let user = user::init(Arc::new(streams), true);
+            let user = connection::init(Arc::new(streams), true);
             user.read_thread();
             UNTRUSTED_USERS.push(user);
             for user in UNTRUSTED_USERS.iter() {

@@ -1,7 +1,7 @@
 use mods::certification::key_agent;
 use mods::certification::sign_util;
 use mods::network::dns_seed;
-use mods::network::server;
+use mods::network::connection_listener;
 use std::io::stdin;
 use std::thread;
 mod mods;
@@ -64,7 +64,7 @@ fn main() {
     key_agent::init();
     sign_util::init();
     thread::spawn(|| {
-        server::run();
+        connection_listener::run();
         println!("thread-Inited");
     });
     dns_seed::init();
