@@ -1,4 +1,9 @@
+# privateでないノードが一つでもある場合、
+# 台帳データは公開されているも同然となることに注意してください
+
+private: false
 network: 
+  own-ip: 60.33.232.165
   domain: seed.yutadd.com
   bind-addr: 0.0.0.0
   bind-port: 7777

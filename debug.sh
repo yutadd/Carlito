@@ -4,4 +4,4 @@ cd source
 cargo build
 cd ..
 cp source/target/debug/Carlito bin/
-./bin/Carlito
+./bin/Carlito $*

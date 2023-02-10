@@ -6,4 +6,4 @@ cargo rustc --tests
 cd ..
 cp source/target/debug/deps/Carlito-* bin/
 rm -f bin/*.d
-./bin/Carlito-*
+./bin/Carlito-* $*

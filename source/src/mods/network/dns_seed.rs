@@ -1,7 +1,11 @@
 use super::super::config_wrapper::config;
+use super::user;
+use super::user::UNTRUSTED_USERS;
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
+use std::net::TcpStream;
 use std::str::FromStr;
+use std::sync::Arc;
 use trust_dns_client::client::{Client, SyncClient};
 use trust_dns_client::op::DnsResponse;
 use trust_dns_client::rr::{DNSClass, Name, RData, RecordType};
@@ -23,6 +27,7 @@ pub static CLIENT: Lazy<SyncClient<UdpClientConnection>> = Lazy::new(|| unsafe {
 });
 
 fn get_addr(name: String) -> Vec<Ipv4Addr> {
+    println!("request resolv: {}", name);
     let name = Name::from_str(name.as_str()).unwrap();
     let response: DnsResponse = CLIENT.query(&name, DNSClass::IN, RecordType::A).unwrap();
     let mut v = Vec::new();
@@ -35,7 +40,34 @@ fn get_addr(name: String) -> Vec<Ipv4Addr> {
     v
 }
 pub fn init() {
-    let addrs = get_addr("seed.yutadd.com".to_string());
+    let mut addrs = Vec::new();
+    unsafe {
+        addrs = get_addr(
+            config::YAML["network"]["domain"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        );
+    }
+    for addr in addrs {
+        unsafe {
+            if addr
+                .to_string()
+                .eq(config::YAML["network"]["own-ip"].as_str().unwrap())
+            {
+                continue;
+            }
+        }
+        let _user = user::init(
+            Arc::new(TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)).unwrap()),
+            false,
+        );
+        _user.read_thread();
+        unsafe {
+            UNTRUSTED_USERS.push(_user);
+        }
+    }
+
     //TODO: 接続施行およびuser::USERSへの登録を行う。
 }
 #[test]
