@@ -37,13 +37,11 @@ impl Connection {
         let id = self.id;
         thread::spawn(move || {
             let mut reader = BufReader::new(&*stream2);
-            println!("");
             loop {
                 let mut line = String::new();
                 let bytes = reader.read_line(&mut line).unwrap();
                 if bytes == 0 {
                     println!("接続終了");
-                    let mut remove = 0;
                     let _aru = false;
                     unsafe {
                         UNTRUSTED_USERS.remove(get_idx(id));

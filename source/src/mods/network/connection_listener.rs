@@ -22,9 +22,6 @@ pub fn run() {
             let user = connection::init(Arc::new(streams));
             user.read_thread();
             UNTRUSTED_USERS.push(user);
-            for user in UNTRUSTED_USERS.iter() {
-                //user.write("Hi from rust\r\n".to_string());
-            }
         }
     }
 }
