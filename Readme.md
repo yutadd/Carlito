@@ -20,28 +20,26 @@ RestAPIの作成（未作業）
 ↓
 実証運転＆APIを利用したフロントエンド例やDAPPsの作成（未作業）
 ```
+### それぞれの仕組み
+ネットワーク  
+![network graph](https://github.com/yutadd/Carlito/blob/master/images/Carlito.png)  
+認証  
+![handshake graph](https://github.com/yutadd/Carlito/blob/master/images/Carlito2.png)
+
 
 ## 実行方法
 
 ### シュミレーション
 
 docker compose を用いて、DNSと3つのノードが存在するCarlitoネットワークをシミュレーションすることができます！  
-![network graph](https://github.com/yutadd/Carlito/blob/master/images/Carlito.png)  
-これを試してみてください！！！  
-Carlitoのrootで！  
+Carlitoのrootで個のコマンドを実行することにより、しばらくする時どう完了します！  
 ```
 docker compose up
 ```
-正常であれば、起動完了時すると、  
-1. 3つのノードの相互接続が行われ、計6回(経路*2)  
+正常であれば、起動完了時すると以下が計6回(経路*2)分表示されます。  
 ```
 verifying connection success
 ```
-が表示されます。  
-
-### ノード間認証の仕組み
-
-![handshake graph](https://github.com/yutadd/Carlito/blob/master/images/Carlito2.png)
 
 
 ### 本番環境(計画中)
