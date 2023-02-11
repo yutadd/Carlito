@@ -1,0 +1,15 @@
+# privateでないノードが一つでもある場合、
+# 台帳データは公開されているも同然となることに注意してください
+private: false
+docker: 
+  is-docker: true
+  own-name: node03
+network: 
+  own-ip: 172.18.0.6
+  domain: seed.yutadd.com
+  bind-addr: 172.18.0.6
+  bind-port: 7777
+   #docker won't use
+  dns: 
+    ip: 8.8.8.8
+    port: 53

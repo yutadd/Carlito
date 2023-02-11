@@ -1,0 +1,12 @@
+@             60  IN SOA ns1.yutadd.com. user01@yutadd.com.(
+                        10
+                        8800
+                        4400
+                        3600
+                        8640
+                                )
+@       IN      NS     ns1.yutadd.com.
+ns1     IN      A       172.18.0.3
+seed    60     IN      A       172.18.0.4
+seed    60     IN      A       172.18.0.5
+seed    60     IN      A       172.18.0.6
