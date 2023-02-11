@@ -19,7 +19,7 @@ pub fn run() {
         println!("connection incoming!");
         let streams = streams.unwrap();
         unsafe {
-            let user = connection::init(Arc::new(streams), true);
+            let user = connection::init(Arc::new(streams));
             user.read_thread();
             UNTRUSTED_USERS.push(user);
             for user in UNTRUSTED_USERS.iter() {

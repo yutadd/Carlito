@@ -68,7 +68,7 @@ pub fn init() {
                 }
             }
 
-            let _user = connection::init(Arc::new(connection), false);
+            let _user = connection::init(Arc::new(connection));
             _user.read_thread();
             unsafe {
                 UNTRUSTED_USERS.push(_user);
@@ -104,7 +104,7 @@ pub fn init() {
                 }
             }
 
-            let _user = connection::init(Arc::new(connection), false);
+            let _user = connection::init(Arc::new(connection));
             _user.read_thread();
             unsafe {
                 UNTRUSTED_USERS.push(_user);

@@ -18,8 +18,18 @@ pub struct Connection {
     pub id: u16,
     pub user: Arc<TcpStream>,
     pub pubk: Option<PublicKey>,
-    pub is_inbound: bool,
     pub nonce: Option<String>,
+}
+impl Clone for Connection {
+    fn clone(&self) -> Connection {
+        Connection {
+            isok: self.isok,
+            id: self.id,
+            user: self.user.clone(),
+            pubk: self.pubk,
+            nonce: (&self.nonce).clone(),
+        }
+    }
 }
 impl Connection {
     pub fn read_thread(&self) {
@@ -49,14 +59,20 @@ impl Connection {
                                     .unwrap()
                                     .clone(),
                             );
-                            let mut rng = rand::thread_rng();
-                            let generated_rand = rng.next_u32();
-                            UNTRUSTED_USERS[get_idx(id)].write(format!(
-                                "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
-                                generated_rand
-                            ));
-                            UNTRUSTED_USERS[get_idx(id)].nonce =
-                                Option::Some(format!("{}", generated_rand));
+                            if sign_util::TRUSTED_KEY
+                                .contains(&UNTRUSTED_USERS[get_idx(id)].pubk.unwrap().to_string())
+                            {
+                                let mut rng = rand::thread_rng();
+                                let generated_rand = rng.next_u32();
+                                UNTRUSTED_USERS[get_idx(id)].write(format!(
+                                    "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
+                                    generated_rand
+                                ));
+                                UNTRUSTED_USERS[get_idx(id)].nonce =
+                                    Option::Some(format!("{}", generated_rand));
+                            } else {
+                                println!("connection dropped out for wrong pubk.");
+                            }
                         }
                     } else if json_obj["type"].eq("req_sign") {
                         unsafe {
@@ -68,6 +84,7 @@ impl Connection {
                                 "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
                                 sign.to_string()
                             ));
+                            println!("sign was sent");
                         }
                     } else if json_obj["type"].eq("signed") {
                         unsafe {
@@ -76,8 +93,27 @@ impl Connection {
                                 json_obj["args"]["sign"].as_str().unwrap().to_string(),
                                 UNTRUSTED_USERS[get_idx(id)].pubk.unwrap(),
                             );
-                            println!("verify result:{}", verify_result)
+
+                            if verify_result {
+                                println!("verifying connection success",);
+                                TRUSTED_USERS.push(UNTRUSTED_USERS[get_idx(id)].clone());
+                                UNTRUSTED_USERS.remove(get_idx(id));
+                                println!("registed user as trusted.\nuntrusted_Connections:{}\ntrusted_connection:{}",UNTRUSTED_USERS.len(),TRUSTED_USERS.len());
+                                for elm in TRUSTED_USERS.iter() {
+                                    println!("trusted:{}", elm.pubk.unwrap().to_string());
+                                }
+                                for elm in UNTRUSTED_USERS.iter() {
+                                    println!(
+                                        "untrusted:{}",
+                                        elm.pubk.expect("<before starting verify>")
+                                    );
+                                }
+                            } else {
+                                println!("failed to verify this connection");
+                            }
                         }
+                    } else {
+                        println!("connection received unknown command");
                     }
                 }
                 println!("{}", line);
@@ -99,31 +135,35 @@ fn get_idx(id: u16) -> usize {
         UNTRUSTED_USERS.len()
     }
 }
-pub fn init(stream: Arc<TcpStream>, is_inbound: bool) -> Connection {
+pub fn init(stream: Arc<TcpStream>) -> Connection {
     *COUNT.lock().unwrap() += 1;
-    if !is_inbound {
-        unsafe {
-            let key = key_agent::SECRET[0]
-                .public_key(&sign_util::SECP)
-                .to_string();
-            (&*stream)
-                .write_all(
-                    format!(
-                        "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
-                        key.to_string()
-                    )
-                    .as_bytes(),
+
+    unsafe {
+        let key = key_agent::SECRET[0]
+            .public_key(&sign_util::SECP)
+            .to_string();
+        (&*stream)
+            .write_all(
+                format!(
+                    "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
+                    key
                 )
-                .unwrap();
-            (&*stream).flush().unwrap();
-        }
+                .as_bytes(),
+            )
+            .unwrap();
+        (&*stream).flush().unwrap();
+
+        println!(
+            "secret:{}\nsent pubk:{}",
+            key_agent::SECRET[0].display_secret(),
+            key
+        )
     }
     Connection {
         user: stream,
         id: *COUNT.lock().unwrap(),
         isok: true,
         pubk: Option::None,
-        is_inbound: is_inbound,
         nonce: Option::None,
     }
 }

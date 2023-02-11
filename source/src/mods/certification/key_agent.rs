@@ -13,12 +13,14 @@ pub static mut SECRET: Vec<SecretKey> = Vec::new();
 */
 //create file or read file
 pub fn init() {
-    let mut is_exst = false;
+    let mut is_exst = true;
     let f: File;
     if !Path::new("secret/secret.txt").exists() {
+        print!("secret isn't exists.");
         fs::create_dir_all("secret/").unwrap();
         is_exst = false;
     }
+    println!("secret is exists");
     f = OpenOptions::new()
         .create(true)
         .read(true)
@@ -26,6 +28,7 @@ pub fn init() {
         .open("secret/secret.txt")
         .unwrap();
     if !is_exst {
+        println!("creating secret key.");
         create_new_key();
     }
     unsafe {
@@ -39,15 +42,18 @@ fn create_new_key() {
     append_key_to_file(secret_key);
 }
 unsafe fn read_key_from_file(file: File) {
-    let mut svec: Vec<SecretKey> = Vec::new();
+    let secp = Secp256k1::new();
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line.unwrap();
         let key: SecretKey = SecretKey::from_str(&line).unwrap();
-        svec.push(key);
-    }
-    for _ in 0..svec.len() {
-        SECRET.push(svec.pop().unwrap());
+        println!(
+            "readed line:{}\nconverted to key:{}\nconverted pubk:{}",
+            line,
+            key.display_secret(),
+            key.public_key(&secp).to_string()
+        );
+        SECRET.push(key);
     }
 }
 fn append_key_to_file(key: SecretKey) {
@@ -79,5 +85,13 @@ fn make_key() {
     let secp = Secp256k1::new();
     let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
     println!("{}", secret_key.display_secret());
-    println!("{}", secret_key.public_key(&secp).x_only_public_key().0)
+    println!("{}", secret_key.public_key(&secp).to_string())
+}
+#[test]
+fn check_key() {
+    let secp = Secp256k1::new();
+    let sk =
+        SecretKey::from_str("c2b56c7e50a19fbdd8fe5546fb21d2d7cb60c5fe95cd719bc64ba1fbf0bec955")
+            .unwrap();
+    println!("{}", sk.public_key(&secp).to_string());
 }
