@@ -31,6 +31,14 @@ Carlitoのrootで！
 ```
 docker compose up
 ```
+正常であれば、起動完了時すると、
+1. 3つのノードの相互接続が行われ、計6回(経路*2)
+```
+verifying connection success
+```
+が表示されます。
+
+
 
 ### 本番環境(計画中)
 
