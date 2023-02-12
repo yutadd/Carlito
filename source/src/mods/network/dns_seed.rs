@@ -1,12 +1,14 @@
 #![feature(catch_expr)]
 use super::super::config_wrapper::config;
 use super::connection;
-use super::connection::UNTRUSTED_USERS;
+use super::connection::CONNECTION_LIST;
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 use trust_dns_client::client::{Client, SyncClient};
 use trust_dns_client::op::DnsResponse;
 use trust_dns_client::rr::{DNSClass, Name, RData, RecordType};
@@ -47,15 +49,18 @@ pub fn init() {
     }
     if is_docker {
         let hosts = Vec::from(["node01", "node02", "node03"]);
+        let own_name: &str = "";
+        unsafe {
+            let own_name = config::YAML["docker"]["own-name"].as_str().unwrap();
+            thread::sleep(Duration::from_secs((own_name.as_bytes()[5] - 48).into()));
+            //↑dockerが同時に立ち上がり、listeningしていないときに接続を試みることを防ぐため、名前に合わせて数秒待つ
+        }
+
         for addr in hosts {
-            unsafe {
-                if addr
-                    .to_string()
-                    .eq(config::YAML["docker"]["own-name"].as_str().unwrap())
-                {
-                    continue;
-                }
+            if addr.to_string().eq(own_name) {
+                continue;
             }
+
             // TODO: 起動する順番によってはまだ接続できない場合があるから、そのための例外処理を行う
             let connection: TcpStream;
             match TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)) {
@@ -69,9 +74,10 @@ pub fn init() {
             }
 
             let _user = connection::init(Arc::new(connection));
-            _user.read_thread();
+            let mut _user2 = _user.clone();
+            thread::spawn(move || _user2.read_thread());
             unsafe {
-                UNTRUSTED_USERS.push(_user);
+                CONNECTION_LIST.push(_user);
             }
         }
     } else {
@@ -104,10 +110,10 @@ pub fn init() {
                 }
             }
 
-            let _user = connection::init(Arc::new(connection));
+            let mut _user = connection::init(Arc::new(connection));
             _user.read_thread();
             unsafe {
-                UNTRUSTED_USERS.push(_user);
+                CONNECTION_LIST.push(_user);
             }
         }
     }

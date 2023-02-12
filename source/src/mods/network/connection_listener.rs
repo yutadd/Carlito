@@ -1,8 +1,9 @@
 use super::super::config_wrapper::config::YAML;
 use super::connection;
-use super::connection::UNTRUSTED_USERS;
+use super::connection::CONNECTION_LIST;
 use std::net::TcpListener;
 use std::sync::Arc;
+use std::thread;
 
 pub fn run() {
     let bind_target;
@@ -20,8 +21,9 @@ pub fn run() {
         let streams = streams.unwrap();
         unsafe {
             let user = connection::init(Arc::new(streams));
-            user.read_thread();
-            UNTRUSTED_USERS.push(user);
+            let mut user2 = user.clone();
+            CONNECTION_LIST.push(user);
+            thread::spawn(move || user2.read_thread());
         }
     }
 }

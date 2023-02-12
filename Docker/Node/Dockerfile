@@ -1,6 +1,6 @@
 FROM rust
-COPY Carlito /root/Carlito/
+COPY ../../ /root/Carlito/
 WORKDIR /root/Carlito/source
-RUN cargo update && cargo build
+RUN cargo update
 WORKDIR /root/Carlito
 ENTRYPOINT [ "./debug.sh" ]

@@ -1,7 +1,7 @@
 use mods::certification::key_agent;
 use mods::certification::sign_util;
-use mods::network::dns_seed;
 use mods::network::connection_listener;
+use mods::network::dns_seed;
 use std::io::stdin;
 use std::thread;
 mod mods;
@@ -71,10 +71,9 @@ fn main() {
     println!("Inited");
     loop {
         let line = &mut String::new();
-        let size=stdin().read_line(line).unwrap();
-        if size>0{
+        let size = stdin().read_line(line).unwrap();
+        if size > 0 {
             println!("your input:{}", line);
         }
-        
     }
 }
