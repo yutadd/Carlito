@@ -32,14 +32,11 @@ RestAPIの作成（未作業）
 ### シュミレーション
 
 docker compose を用いて、DNSと3つのノードが存在するCarlitoネットワークをシミュレーションすることができます！  
-Carlitoのrootで個のコマンドを実行することにより、しばらくする時どう完了します！  
+Carlitoのrootで個のコマンドを実行することにより、しばらくすると完了します！  
 ```
 docker compose up
 ```
-正常であれば、起動完了時すると以下が計6回(経路*2)分表示されます。  
-```
-verifying connection success
-```
+
 
 
 ### 本番環境(計画中)
