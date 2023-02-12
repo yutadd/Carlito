@@ -111,7 +111,8 @@ pub fn init() {
             }
 
             let mut _user = connection::init(Arc::new(connection));
-            _user.read_thread();
+            let mut _user2 = _user.clone();
+            thread::spawn(move || _user2.read_thread());
             unsafe {
                 CONNECTION_LIST.push(_user);
             }
