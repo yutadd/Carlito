@@ -43,11 +43,7 @@ pub fn is_host_trusted(key: String) -> bool {
     let mut exists: bool = false;
     unsafe {
         for i in 0..TRUSTED_KEY.len() {
-            if TRUSTED_KEY
-                .get(&i)
-                .unwrap()
-                .eq_ignore_ascii_case(&key)
-            {
+            if TRUSTED_KEY.get(&i).unwrap().eq_ignore_ascii_case(&key) {
                 exists = true;
             }
         }
@@ -62,7 +58,7 @@ fn sign_util_init() {
 fn sign_util_trusted_host() {
     init();
     assert!(is_host_trusted(
-        "f0cd5f5b47d983c4c5c173444e577bcffda3884f6f53b03cf5f97b5ed25d692f".to_string()
+        "026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908".to_string()
     ));
 }
 
