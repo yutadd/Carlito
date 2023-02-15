@@ -67,9 +67,9 @@ fn sign_util_verify() {
     use crate::mods::certification::key_agent;
     key_agent::init();
     let sign = create_sign("HelloWorld".to_string(), *key_agent::get_key(0).unwrap());
-    println!("{}", sign);
+    println!("show sign:{}", sign);
     println!(
-        "{}",
+        "verify sign:{}",
         verify_sign(
             "HelloWorld".to_string(),
             sign.to_string(),
@@ -77,7 +77,7 @@ fn sign_util_verify() {
         )
     );
     println!(
-        "{}",
+        "verify wrong message:{}",
         verify_sign(
             "HelloWorld01".to_string(),
             sign.to_string(),

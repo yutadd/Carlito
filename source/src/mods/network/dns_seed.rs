@@ -37,7 +37,7 @@ fn get_addr(name: String) -> Vec<Ipv4Addr> {
     for answor in response.answers() {
         if let Some(RData::A(addr)) = answor.data() {
             v.push(*addr);
-            println!("fetched seeds addr:\n{}", *addr);
+            println!("fetched seeds addr: {}", *addr);
         }
     }
     v
@@ -123,6 +123,6 @@ pub fn init() {
 }
 #[test]
 fn dns_seed_fetch() {
-    let addrs = get_addr("yahoo.co.jp".to_string());
+    let addrs = get_addr("amazon.com".to_string());
     println!("sum:{}", addrs.len());
 }

@@ -18,7 +18,6 @@ pub struct Transaction {
 }
 impl Transaction {
     pub fn check(&self) -> bool {
-        println!("{}\n{}\n{}", self.transaction_data, self.sign, self.author);
         sign_util::verify_sign(
             self.transaction_data.clone(),
             self.sign.to_string(),
@@ -33,10 +32,9 @@ pub fn from_str(raw_data: String) -> Transaction {
     let raw_clone = raw_data.clone();
     let sign_params: Vec<&str> = raw_clone.split("@").collect();
     let param: Vec<&str> = sign_params[0].split(",").collect();
-    println!("sign:{}", sign_params[1]);
     unsafe {
         println!(
-            "{}",
+            "transaction-show-public:{}",
             key_agent::SECRET
                 .get(0)
                 .unwrap()
@@ -62,18 +60,16 @@ fn parse_transaction() {
     unsafe {
         let sign = sign_util::create_sign(text.to_string(), *key_agent::SECRET.get(0).unwrap());
         let raw_data = format!("{}@{}", text, sign.to_string());
-        println!("raw_data:{}", raw_data);
         let ts = from_str(raw_data);
-        println!("transaction_check_sign:{}", ts.check());
         assert!(ts.check());
     }
 }
 #[test]
 fn show_date() {
     let timestamp = Local::now().timestamp_millis();
-    println!("{}", timestamp);
+    println!("transaction_timestamp:{}", timestamp);
     println!(
-        "{}",
+        "restored_timestamp:{}",
         NaiveDateTime::from_timestamp_millis(timestamp)
             .unwrap()
             .timestamp_millis()
