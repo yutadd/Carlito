@@ -48,23 +48,21 @@ impl Connection {
                 let json_obj = json::parse(&line).unwrap();
                 if json_obj["type"].eq("hello") {
                     println!("received pubk is {}", json_obj["args"]["pubk"]);
-                    unsafe {
-                        self.pubk = Option::Some(
-                            PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
-                                .unwrap()
-                                .clone(),
-                        );
-                        if sign_util::TRUSTED_KEY.contains(&self.pubk.unwrap().to_string()) {
-                            let mut rng = rand::thread_rng();
-                            let generated_rand = rng.next_u32();
-                            self.write(format!(
-                                "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
-                                generated_rand
-                            ));
-                            self.nonce = Option::Some(format!("{}", generated_rand));
-                        } else {
-                            println!("connection dropped out for wrong pubk.");
-                        }
+                    self.pubk = Option::Some(
+                        PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
+                            .unwrap()
+                            .clone(),
+                    );
+                    if sign_util::is_host_trusted(self.pubk.unwrap().to_string()) {
+                        let mut rng = rand::thread_rng();
+                        let generated_rand = rng.next_u32();
+                        self.write(format!(
+                            "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
+                            generated_rand
+                        ));
+                        self.nonce = Option::Some(format!("{}", generated_rand));
+                    } else {
+                        println!("connection dropped out for wrong pubk.");
                     }
                 } else if json_obj["type"].eq("req_sign") {
                     unsafe {
@@ -79,19 +77,16 @@ impl Connection {
                         println!("sign was sent");
                     }
                 } else if json_obj["type"].eq("signed") {
-                    unsafe {
-                        let verify_result = sign_util::verify_sign(
-                            self.nonce.clone().unwrap(),
-                            json_obj["args"]["sign"].as_str().unwrap().to_string(),
-                            self.pubk.unwrap(),
-                        );
-
-                        if verify_result {
-                            println!("verifying connection success",);
-                            self.is_trusted = true;
-                        } else {
-                            println!("failed to verify this connection");
-                        }
+                    let verify_result = sign_util::verify_sign(
+                        self.nonce.clone().unwrap(),
+                        json_obj["args"]["sign"].as_str().unwrap().to_string(),
+                        self.pubk.unwrap(),
+                    );
+                    if verify_result {
+                        println!("verifying connection success",);
+                        self.is_trusted = true;
+                    } else {
+                        println!("failed to verify this connection");
                     }
                 } else {
                     println!("connection received unknown command");
