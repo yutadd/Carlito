@@ -1,4 +1,4 @@
-use super::super::config_wrapper::config::YAML;
+use super::super::config::config::YAML;
 use super::connection;
 use super::connection::CONNECTION_LIST;
 use std::net::TcpListener;

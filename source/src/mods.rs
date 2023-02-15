@@ -1,4 +1,6 @@
-pub mod network;
-pub mod config_wrapper;
+pub mod block;
 pub mod certification;
+pub mod config;
+pub mod network;
+pub mod transaction;
 pub mod util;

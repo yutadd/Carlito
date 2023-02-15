@@ -2,18 +2,16 @@ use super::super::certification::key_agent;
 use super::super::certification::sign_util;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
-use secp256k1::ecdsa::Signature;
 use secp256k1::PublicKey;
-use secp256k1::XOnlyPublicKey;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::{io::BufReader, net::TcpStream};
-use std::{sync::Arc, thread};
 static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
 pub static mut CONNECTION_LIST: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
 pub struct Connection {
-    pub isok: bool,
+    pub isok: Arc<bool>, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,
     pub stream: Arc<TcpStream>,
     pub is_trusted: bool,
@@ -23,7 +21,7 @@ pub struct Connection {
 impl Clone for Connection {
     fn clone(&self) -> Connection {
         Connection {
-            isok: self.isok,
+            isok: self.isok.clone(),
             id: self.id,
             stream: self.stream.clone(),
             is_trusted: self.is_trusted,
@@ -135,7 +133,7 @@ pub fn init(stream: Arc<TcpStream>) -> Connection {
     }
     Connection {
         id: *COUNT.lock().unwrap(),
-        isok: true,
+        isok: Arc::new(true),
         stream: stream,
         is_trusted: false,
         pubk: Option::None,

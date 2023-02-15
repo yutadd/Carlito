@@ -1,5 +1,5 @@
 #![feature(catch_expr)]
-use super::super::config_wrapper::config;
+use super::super::config::config;
 use super::connection;
 use super::connection::CONNECTION_LIST;
 use once_cell::sync::Lazy;
