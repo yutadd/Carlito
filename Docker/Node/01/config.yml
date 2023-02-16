@@ -4,6 +4,7 @@ private: false
 docker: 
   is-docker: true
   own-name: node01
+  own-pubk: 02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630
 network: 
   own-ip: 172.18.0.4
   domain: seed.yutadd.com

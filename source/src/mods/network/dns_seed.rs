@@ -49,36 +49,33 @@ pub fn init() {
     }
     if is_docker {
         let hosts = Vec::from(["node01", "node02", "node03"]);
-        let own_name: &str = "";
         unsafe {
             let own_name = config::YAML["docker"]["own-name"].as_str().unwrap();
             thread::sleep(Duration::from_secs((own_name.as_bytes()[5] - 48).into()));
-            //↑dockerが同時に立ち上がり、listeningしていないときに接続を試みることを防ぐため、名前に合わせて数秒待つ
-        }
-
-        for addr in hosts {
-            if addr.to_string().eq(own_name) {
-                continue;
-            }
-
-            // TODO: 起動する順番によってはまだ接続できない場合があるから、そのための例外処理を行う
-            let connection: TcpStream;
-            match TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)) {
-                Ok(stream) => {
-                    connection = stream;
-                }
-                Err(error) => {
-                    println!("未接続:{}", error.kind());
+            for addr in hosts {
+                if addr.to_string().eq(own_name) {
                     continue;
                 }
-            }
+                // TODO: 起動する順番によってはまだ接続できない場合があるから、そのための例外処理を行う
+                let connection: TcpStream;
+                match TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)) {
+                    Ok(stream) => {
+                        connection = stream;
+                    }
+                    Err(error) => {
+                        println!("未接続:{}", error.kind());
+                        continue;
+                    }
+                }
 
-            let _user = connection::init(Arc::new(connection));
-            let mut _user2 = _user.clone();
-            thread::spawn(move || _user2.read_thread());
-            unsafe {
-                CONNECTION_LIST.push(_user);
+                let _user = connection::init(Arc::new(connection));
+                let mut _user2 = _user.clone();
+                thread::spawn(move || _user2.read_thread());
+                unsafe {
+                    CONNECTION_LIST.push(_user);
+                }
             }
+            //↑dockerが同時に立ち上がり、listeningしていないときに接続を試みることを防ぐため、名前に合わせて数秒待つ
         }
     } else {
         let mut addrs = Vec::new();

@@ -1,3 +1,5 @@
+use crate::mods::config::config;
+
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
 use once_cell::sync::Lazy;
@@ -14,7 +16,7 @@ pub struct Connection {
     pub isok: Arc<bool>, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,
     pub stream: Arc<TcpStream>,
-    pub is_trusted: bool,
+    pub is_trusted: Arc<bool>,
     pub pubk: Option<PublicKey>,
     pub nonce: Option<String>,
 }
@@ -24,14 +26,14 @@ impl Clone for Connection {
             isok: self.isok.clone(),
             id: self.id,
             stream: self.stream.clone(),
-            is_trusted: self.is_trusted,
+            is_trusted: Arc::new(*self.is_trusted),
             pubk: self.pubk,
             nonce: (&self.nonce).clone(),
         }
     }
 }
 impl Connection {
-    pub fn read_thread(&mut self) {
+    pub fn read_thread(&self) {
         let mut reader = BufReader::new(&*self.stream);
         loop {
             let mut line = String::new();
@@ -46,21 +48,29 @@ impl Connection {
                 let json_obj = json::parse(&line).unwrap();
                 if json_obj["type"].eq("hello") {
                     println!("received pubk is {}", json_obj["args"]["pubk"]);
-                    self.pubk = Option::Some(
-                        PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
-                            .unwrap()
-                            .clone(),
-                    );
-                    if sign_util::is_host_trusted(self.pubk.unwrap().to_string()) {
-                        let mut rng = rand::thread_rng();
-                        let generated_rand = rng.next_u32();
-                        self.write(format!(
-                            "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
-                            generated_rand
-                        ));
-                        self.nonce = Option::Some(format!("{}", generated_rand));
-                    } else {
-                        println!("connection dropped out for wrong pubk.");
+                    unsafe {
+                        CONNECTION_LIST[get_idx(self.id)].pubk = Option::Some(
+                            PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
+                                .unwrap()
+                                .clone(),
+                        );
+                    }
+                    unsafe {
+                        if sign_util::is_host_trusted(
+                            CONNECTION_LIST[get_idx(self.id)].pubk.unwrap().to_string(),
+                        ) {
+                            let mut rng = rand::thread_rng();
+                            let generated_rand = rng.next_u32();
+                            self.write(format!(
+                                "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
+                                generated_rand
+                            ));
+
+                            CONNECTION_LIST[get_idx(self.id)].nonce =
+                                Option::Some(format!("{}", generated_rand));
+                        } else {
+                            println!("connection dropped out for wrong pubk.");
+                        }
                     }
                 } else if json_obj["type"].eq("req_sign") {
                     unsafe {
@@ -75,14 +85,25 @@ impl Connection {
                         println!("sign was sent");
                     }
                 } else if json_obj["type"].eq("signed") {
-                    let verify_result = sign_util::verify_sign(
-                        self.nonce.clone().unwrap(),
-                        json_obj["args"]["sign"].as_str().unwrap().to_string(),
-                        self.pubk.unwrap(),
-                    );
+                    let verify_result;
+                    unsafe {
+                        verify_result = sign_util::verify_sign(
+                            CONNECTION_LIST[get_idx(self.id)].nonce.clone().unwrap(),
+                            json_obj["args"]["sign"].as_str().unwrap().to_string(),
+                            CONNECTION_LIST[get_idx(self.id)].pubk.unwrap(),
+                        );
+                    }
                     if verify_result {
-                        println!("verifying connection success",);
-                        self.is_trusted = true;
+                        println!("verifying connection success");
+                        unsafe {
+                            CONNECTION_LIST[get_idx(self.id)].is_trusted = Arc::new(true);
+                        }
+                        unsafe {
+                            println!(
+                                "is trusted:{}",
+                                CONNECTION_LIST[get_idx(self.id)].is_trusted.to_string()
+                            );
+                        }
                     } else {
                         println!("failed to verify this connection");
                     }
@@ -96,6 +117,32 @@ impl Connection {
     pub fn write(&self, context: String) {
         (&*self.stream).write_all(context.as_bytes()).unwrap();
         (&*self.stream).flush().unwrap();
+    }
+}
+
+pub fn is_all_connected() -> bool {
+    unsafe {
+        for tk in sign_util::TRUSTED_KEY.values() {
+            if !tk.eq(config::YAML["docker"]["own-pubk"].as_str().unwrap()) {
+                let mut aru = false;
+                for c in CONNECTION_LIST.iter() {
+                    if *c.is_trusted {
+                        if c.pubk.unwrap().to_string().eq(tk) {
+                            aru = true;
+                            break;
+                        }
+                    }
+                }
+                if !aru {
+                    println!("[summary]there is not connected node");
+                    println!("[summary]not connected node:{}", tk);
+                    return false;
+                } else {
+                    println!("[summary] ok");
+                }
+            }
+        }
+        return true;
     }
 }
 fn get_idx(id: u16) -> usize {
@@ -135,7 +182,7 @@ pub fn init(stream: Arc<TcpStream>) -> Connection {
         id: *COUNT.lock().unwrap(),
         isok: Arc::new(true),
         stream: stream,
-        is_trusted: false,
+        is_trusted: Arc::new(false),
         pubk: Option::None,
         nonce: Option::None,
     }

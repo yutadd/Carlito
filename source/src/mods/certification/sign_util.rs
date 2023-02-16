@@ -16,11 +16,12 @@ pub fn init() {
         .open("Config/trusted_hosts.txt")
         .unwrap();
     let reader = BufReader::new(file);
-    let index = 0;
+    let mut index = 0;
     unsafe {
         for line in reader.lines() {
             let line = line.unwrap();
             TRUSTED_KEY.insert(index, line);
+            index += 1;
         }
     }
 }
@@ -41,13 +42,23 @@ pub fn verify_sign(original_message: String, sig: String, public_key: PublicKey)
 }
 pub fn is_host_trusted(key: String) -> bool {
     let mut exists: bool = false;
+    let mut vector_str = "".to_string();
     unsafe {
+        println!("trusted_hosts:{}", TRUSTED_KEY.len());
         for i in 0..TRUSTED_KEY.len() {
-            if TRUSTED_KEY.get(&i).unwrap().eq_ignore_ascii_case(&key) {
+            vector_str = format!(
+                "{}{}{}",
+                vector_str,
+                TRUSTED_KEY.get(&i).unwrap().as_str(),
+                "\n"
+            );
+            if TRUSTED_KEY.get(&i).unwrap().eq(&key) {
                 exists = true;
+                break;
             }
         }
     }
+    println!("key:{} was {} on [{}]", key, exists, vector_str);
     exists
 }
 #[test]
