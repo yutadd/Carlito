@@ -36,7 +36,7 @@ pub fn verify_sign(original_message: String, sig: String, public_key: PublicKey)
         SECP.verify_ecdsa(&message, &sig.unwrap(), &public_key)
             .is_ok()
     } else {
-        println!("公開鍵のparseに失敗しました");
+        eprintln!("[sign_util]公開鍵のparseに失敗しました");
         false
     }
 }
@@ -58,7 +58,7 @@ pub fn is_host_trusted(key: String) -> bool {
             }
         }
     }
-    println!("key:{} was {} on [{}]", key, exists, vector_str);
+    println!("[sign_util]key:{} was {} on [{}]", key, exists, vector_str);
     exists
 }
 #[test]
@@ -78,9 +78,9 @@ fn sign_util_verify() {
     use crate::mods::certification::key_agent;
     key_agent::init();
     let sign = create_sign("HelloWorld".to_string(), *key_agent::get_key(0).unwrap());
-    println!("show sign:{}", sign);
+    println!("[sign_util]show sign:{}", sign);
     println!(
-        "verify sign:{}",
+        "[sign_util]verify sign:{}",
         verify_sign(
             "HelloWorld".to_string(),
             sign.to_string(),
@@ -88,12 +88,12 @@ fn sign_util_verify() {
         )
     );
     println!(
-        "verify wrong message:{}",
+        "[sign_util]verify wrong message:{}",
         verify_sign(
             "HelloWorld01".to_string(),
             sign.to_string(),
             key_agent::get_key(0).unwrap().public_key(&SECP)
         )
     );
-    println!("end_test_signeture");
+    println!("[sign_util]end_test_signeture");
 }

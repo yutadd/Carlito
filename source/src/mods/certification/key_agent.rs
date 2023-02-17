@@ -16,11 +16,11 @@ pub fn init() {
     let mut is_exst = true;
     let f: File;
     if !Path::new("secret/secret.txt").exists() {
-        println!("secret isn't exists.");
+        println!("[key_agent]secret isn't exists.");
         fs::create_dir_all("secret/").unwrap();
         is_exst = false;
     }
-    println!("secret is exists");
+    println!("[key_agent]secret is exists");
     f = OpenOptions::new()
         .create(true)
         .read(true)
@@ -28,7 +28,7 @@ pub fn init() {
         .open("secret/secret.txt")
         .unwrap();
     if !is_exst {
-        println!("creating secret key.");
+        println!("[key_agent]creating secret key.");
         create_new_key();
     }
     unsafe {
@@ -71,16 +71,16 @@ pub fn get_key_length() -> usize {
 fn key_agent_init() {
     init();
     for i in 0..(get_key_length()) {
-        println!("key_agent_init:{}", get_key(i).unwrap().display_secret());
+        println!("[key_agent]init:{}", get_key(i).unwrap().display_secret());
     }
 }
 #[test]
 fn make_key() {
     let secp = Secp256k1::new();
     let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
-    println!("MAKE_KEY_SECRET:{}", secret_key.display_secret());
+    println!("[key_agent]MAKE_KEY_SECRET:{}", secret_key.display_secret());
     println!(
-        "MAKE_KEY_SECRET:{}",
+        "[key_agent]MAKE_KEY_SECRET:{}",
         secret_key.public_key(&secp).to_string()
     )
 }
@@ -90,5 +90,8 @@ fn key_from_str() {
     let sk =
         SecretKey::from_str("c2b56c7e50a19fbdd8fe5546fb21d2d7cb60c5fe95cd719bc64ba1fbf0bec955")
             .unwrap();
-    println!("key_from_str:{}", sk.public_key(&secp).to_string());
+    println!(
+        "[key_agent]key_from_str:{}",
+        sk.public_key(&secp).to_string()
+    );
 }

@@ -30,14 +30,14 @@ pub static CLIENT: Lazy<SyncClient<UdpClientConnection>> = Lazy::new(|| unsafe {
 });
 
 fn get_addr(name: String) -> Vec<Ipv4Addr> {
-    println!("request resolv: {}", name);
+    println!("[dns_seed]request resolv: {}", name);
     let name = Name::from_str(name.as_str()).unwrap();
     let response: DnsResponse = CLIENT.query(&name, DNSClass::IN, RecordType::A).unwrap();
     let mut v = Vec::new();
     for answor in response.answers() {
         if let Some(RData::A(addr)) = answor.data() {
             v.push(*addr);
-            println!("fetched seeds addr: {}", *addr);
+            println!("[dns_seed]fetched seeds addr: {}", *addr);
         }
     }
     v
@@ -63,7 +63,7 @@ pub fn init() {
                         connection = stream;
                     }
                     Err(error) => {
-                        println!("未接続:{}", error.kind());
+                        println!("[dns_seed]未接続:{}", error.kind());
                         continue;
                     }
                 }
@@ -102,7 +102,7 @@ pub fn init() {
                     connection = stream;
                 }
                 Err(error) => {
-                    println!("未接続:{}", error.kind());
+                    println!("[dns_seed]未接続:{}", error.kind());
                     continue;
                 }
             }
@@ -121,5 +121,5 @@ pub fn init() {
 #[test]
 fn dns_seed_fetch() {
     let addrs = get_addr("amazon.com".to_string());
-    println!("sum:{}", addrs.len());
+    println!("[dns_seed]sum:{}", addrs.len());
 }

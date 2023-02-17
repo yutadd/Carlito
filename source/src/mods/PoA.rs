@@ -1,1 +1,1 @@
-pub mod generate_block;
+pub mod blockchain_manager;

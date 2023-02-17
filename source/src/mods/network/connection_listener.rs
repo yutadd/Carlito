@@ -15,9 +15,9 @@ pub fn run() {
         );
     }
     let listener = TcpListener::bind(bind_target).expect("Error: Failed to bind");
-    println!("Listening...");
+    println!("[connection_listener]Listening...");
     for streams in listener.incoming() {
-        println!("connection incoming!");
+        println!("[connection_listener]connection incoming!");
         let streams = streams.unwrap();
         unsafe {
             let user = connection::init(Arc::new(streams));

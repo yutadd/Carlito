@@ -5,7 +5,7 @@ use mods::network::dns_seed;
 use std::io::stdin;
 use std::thread;
 
-use crate::mods::PoA::generate_block;
+use crate::mods::PoA::blockchain_manager;
 mod mods;
 /**
 
@@ -21,21 +21,21 @@ TODO: ノード間TLS通信<br />
 TODO: プロキシへの対応<br />
 */
 fn main() {
-    println!("Initializing...");
+    println!("[main]Initializing...");
     key_agent::init();
     sign_util::init();
     thread::spawn(|| {
         connection_listener::run();
-        println!("thread-Inited");
+        println!("[main]thread-Inited");
     });
     dns_seed::init();
-    thread::spawn(|| generate_block::block_generate());
-    println!("Inited");
+    thread::spawn(|| blockchain_manager::block_generate());
+    println!("[main]Inited");
     loop {
         let line = &mut String::new();
         let size = stdin().read_line(line).unwrap();
         if size > 0 {
-            println!("your input:{}", line);
+            println!("[main]your input:{}", line);
         }
     }
 }

@@ -39,7 +39,7 @@ impl Connection {
             let mut line = String::new();
             let bytes = reader.read_line(&mut line).unwrap();
             if bytes == 0 {
-                println!("接続終了");
+                println!("[connection]接続終了");
                 unsafe {
                     CONNECTION_LIST.remove(get_idx(self.id));
                 }
@@ -47,7 +47,7 @@ impl Connection {
             } else {
                 let json_obj = json::parse(&line).unwrap();
                 if json_obj["type"].eq("hello") {
-                    println!("received pubk is {}", json_obj["args"]["pubk"]);
+                    println!("[connection]received pubk is {}", json_obj["args"]["pubk"]);
                     unsafe {
                         CONNECTION_LIST[get_idx(self.id)].pubk = Option::Some(
                             PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
@@ -69,7 +69,7 @@ impl Connection {
                             CONNECTION_LIST[get_idx(self.id)].nonce =
                                 Option::Some(format!("{}", generated_rand));
                         } else {
-                            println!("connection dropped out for wrong pubk.");
+                            println!("[connection]connection dropped out for wrong pubk.");
                         }
                     }
                 } else if json_obj["type"].eq("req_sign") {
@@ -82,7 +82,7 @@ impl Connection {
                             "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
                             sign.to_string()
                         ));
-                        println!("sign was sent");
+                        println!("[connection]sign was sent");
                     }
                 } else if json_obj["type"].eq("signed") {
                     let verify_result;
@@ -94,21 +94,21 @@ impl Connection {
                         );
                     }
                     if verify_result {
-                        println!("verifying connection success");
+                        println!("[connection]verifying connection success");
                         unsafe {
                             CONNECTION_LIST[get_idx(self.id)].is_trusted = Arc::new(true);
                         }
                         unsafe {
                             println!(
-                                "is trusted:{}",
+                                "[connection]is trusted:{}",
                                 CONNECTION_LIST[get_idx(self.id)].is_trusted.to_string()
                             );
                         }
                     } else {
-                        println!("failed to verify this connection");
+                        println!("[connection]failed to verify this connection");
                     }
                 } else {
-                    println!("connection received unknown command");
+                    println!("[connection]connection received unknown command");
                 }
             }
             println!("{}", line);
@@ -134,11 +134,11 @@ pub fn is_all_connected() -> bool {
                     }
                 }
                 if !aru {
-                    println!("[summary]there is not connected node");
-                    println!("[summary]not connected node:{}", tk);
+                    println!("[connection]there is not connected node");
+                    println!("[connection]not connected node:{}", tk);
                     return false;
                 } else {
-                    println!("[summary] ok");
+                    println!("[connection]ok, already connected");
                 }
             }
         }
@@ -173,7 +173,7 @@ pub fn init(stream: Arc<TcpStream>) -> Connection {
         (&*stream).flush().unwrap();
 
         println!(
-            "secret:{}\nsent pubk:{}",
+            "[connection]secret:{}\n[connection]sent pubk:{}",
             key_agent::SECRET[0].display_secret(),
             key
         )

@@ -13,15 +13,15 @@ pub fn block_generate() {
         if connection::is_all_connected() {
             unsafe {
                 if !PREVIOUS_GENERATOR.lock().unwrap().eq(&String::new()) {
-                    println!("GENERATE BLOCK!");
+                    println!("[blockchain_manager]GENERATE BLOCK!");
                     thread::sleep(Duration::from_secs(1));
                 } else {
-                    println!("[blockchain]preloaded chain is not ready");
+                    println!("[blockchain_manager]preloaded chain is not ready");
                     thread::sleep(Duration::from_secs(8));
                 }
             }
         } else {
-            println!("[blockchain]waiting connection for start generate block.");
+            println!("[blockchain_manager]waiting connection for start generate block.");
             thread::sleep(Duration::from_secs(8));
         }
     }
@@ -38,7 +38,7 @@ pub fn get_next_generator(
             };
         }
     }
-    eprintln!("[get_next_generator]trusted_key has no value");
+    eprintln!("[blockchain_manager]trusted_key has no value");
     return String::new();
 }
 #[test]
