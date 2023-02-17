@@ -2,76 +2,54 @@ use std::str::FromStr;
 
 use base64::Engine;
 use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
+use json::{object, JsonValue};
 use secp256k1::{ecdsa::Signature, PublicKey};
 
 use crate::mods::certification::{
     key_agent,
-    sign_util::{self, SECP},
+    sign_util::{self, create_sign, SECP},
 };
-pub struct Transaction {
-    pub author: PublicKey,
-    pub date: i64,
-    pub text_b64: String,
-    pub sign: Signature,
-    pub raw_data: String,
-    pub transaction_data: String,
+
+pub fn check(transaction: JsonValue) -> bool {
+    let transaction_without_sign = object![
+        author:transaction["author"].to_string(),
+        date:transaction["date"].to_string().parse::<usize>().unwrap(),
+        text_b64:transaction["text_b64"].to_string(),
+    ];
+    sign_util::verify_sign(
+        transaction_without_sign.dump(),
+        transaction["sign"].to_string(),
+        PublicKey::from_str(transaction_without_sign["author"].as_str().unwrap()).unwrap(),
+    )
 }
-impl Transaction {
-    pub fn check(&self) -> bool {
-        sign_util::verify_sign(
-            self.transaction_data.clone(),
-            self.sign.to_string(),
-            self.author,
-        )
-    }
-}
+
 /**
  * 階層構造を扱わないのでraw_textにはcsvを用いる。
 */
-pub fn from_str(raw_data: String) -> Transaction {
-    let raw_clone = raw_data.clone();
-    let sign_params: Vec<&str> = raw_clone.split("@").collect();
-    let param: Vec<&str> = sign_params[0].split(",").collect();
-    unsafe {
-        println!(
-            "transaction-show-public:{}",
-            key_agent::SECRET
-                .get(0)
-                .unwrap()
-                .public_key(&SECP)
-                .to_string()
-        );
-    }
-    Transaction {
-        author: PublicKey::from_str(param[0]).unwrap(),
-        date: param[1].parse::<i64>().unwrap(),
-        text_b64: param[2].to_string(),
-        sign: Signature::from_str(sign_params[1]).unwrap(),
-        raw_data,
-        transaction_data: sign_params[0].to_string(), //raw_data_without_sign
-    }
-}
 
 #[test]
-fn parse_transaction() {
+pub fn parsing_json() {
     key_agent::init();
-    //pubk,timestamp,QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx(base64 of ADDF path/to/file user01),
-    let text="026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908,1676449733,QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx";
+    sign_util::init();
+    let example_transaction = object![
+        author:"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908".to_string(),
+        date:1676449733,
+        text_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
+    ];
+    let dumped_json = example_transaction.dump();
+    println!("dumped_transaction:{}", dumped_json);
     unsafe {
-        let sign = sign_util::create_sign(text.to_string(), *key_agent::SECRET.get(0).unwrap());
-        let raw_data = format!("{}@{}", text, sign.to_string());
-        let ts = from_str(raw_data);
-        assert!(ts.check());
+        println!(
+            "created_transaction_sign:{}",
+            create_sign(dumped_json, key_agent::SECRET[0])
+        )
     }
-}
-#[test]
-fn show_date() {
-    let timestamp = Local::now().timestamp_millis();
-    println!("transaction_timestamp:{}", timestamp);
-    println!(
-        "restored_timestamp:{}",
-        NaiveDateTime::from_timestamp_millis(timestamp)
-            .unwrap()
-            .timestamp_millis()
-    )
+    let check_result=check(json::parse("{
+    \"author\":\"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908\",
+    \"date\":1676449733,
+    \"text_b64\":\"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx\",
+    \"sign\":\"3045022100c4d6d23647dcbdbd1bf9f7abdbd2c427e6d0b732db4633f9fa6ceecdaa5f317b022013c8aba9606e48a5be1eebad06475fb5baeb1e92cd4059c10ee6507c9d38587a\"
+}").unwrap());
+    println!("check_example_transaction:{}", check_result);
+    assert!(check_result);
 }
