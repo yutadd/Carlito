@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use json::{object, JsonValue};
 use once_cell::sync::Lazy;
 use secp256k1::{ecdsa::Signature, PublicKey};
 use std::fs::{self, File};
@@ -18,26 +19,20 @@ pub static genesis_block_hash: &str =
 pub static tx_per_file: usize = 100;
 //pub static mut BLOCKCHAIN: Lazy<Vec<Block>> = Lazy::new(|| Vec::new());
 
-/*pub fn check(&self) -> bool {
-    if (self.height == 1 && self.previous_hash.eq(&genesis_block_hash.to_string()))
-        || (/*TODO: impl later*/false)
-    //Must be implemented to check if a block is connected to the previous block.
-    {
-        if sign_util::verify_sign(
-            self.transaction_data.clone(),
-            self.sign.to_string(),
-            self.author,
-        ) {
-            for t in self.tx.iter() {
-                if !t.check() {
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
-    false
-}*/
+pub fn check(transaction: JsonValue) -> bool {
+    let block_without_sign = object![
+        previous_hash:transaction["previous_hash"].to_string(),
+        author:transaction["author"].to_string(),
+        date:transaction["date"].to_string().parse::<usize>().unwrap(),
+        height:transaction["height"].to_string().parse::<usize>().unwrap(),
+        transactions:transaction["transactions"].clone(),
+    ];
+    sign_util::verify_sign(
+        block_without_sign.dump(),
+        transaction["sign"].to_string(),
+        PublicKey::from_str(block_without_sign["author"].as_str().unwrap()).unwrap(),
+    )
+}
 
 pub fn append_block(text: String) {
     let height_str = text.split("-").collect::<Vec<&str>>();
