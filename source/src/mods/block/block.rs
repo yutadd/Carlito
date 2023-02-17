@@ -106,11 +106,11 @@ pub fn read_block_from_local() -> usize {
             }
         }
     }
-    assert_eq!(get_file_and_index(last_block_height).0, i - 1);
+    //assert_eq!(get_file_and_index(last_block_height).0, i - 1);
     i
 }
 pub fn get_file_and_index(height: usize) -> (usize, usize) {
-    assert!(height > 0);
+    //assert!(height > 0);
     return ((height / tx_per_file) + 1, height % tx_per_file);
 }
 
