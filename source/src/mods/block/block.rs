@@ -132,11 +132,6 @@ pub fn read_block_from_local() {
     unsafe {
         assert!(BLOCKCHAIN.len() > 0);
     }
-    unsafe {
-        for c in connection::CONNECTION_LIST.iter() {
-            c.write("{\"type\":\"get_latest\"}\r\n".to_string());
-        }
-    }
 }
 pub fn get_file_and_index(height: usize) -> (usize, usize) {
     assert!(height > 0);
