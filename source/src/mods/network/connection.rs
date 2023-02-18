@@ -136,14 +136,14 @@ impl Connection {
                             {
                                 if check(json_obj["args"]["block"].clone(), "*".to_string()) {
                                     println(format!(
-                                "[connection]Received lock is correct and taller than my block"
+                                "[connection]Received block is correct and taller than my block"
                             ));
                                 } else {
-                                    eprintln(format!("[connection]Received lock is taller than my block but not correct"));
+                                    eprintln(format!("[connection]Received block is taller than my block but not correct"));
                                 }
                             } else {
                                 eprintln(format!(
-                                    "[connection]Received lock is not taller than my block."
+                                    "[connection]Received block is not taller than my block."
                                 ));
                             }
                         }
