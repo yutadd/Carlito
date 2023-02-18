@@ -2,7 +2,7 @@
 
 ![commit_frequence_badge](https://img.shields.io/github/commit-activity/w/yutadd/Carlito)
 ![last_commit](https://img.shields.io/github/last-commit/yutadd/Carlito)
-![wip](https://img.shields.io/badge/work%20in%20progress-True-green)
+![wip](https://img.shields.io/badge/work%20in%20progress-wip-green)
 
 ## このブロックチェーンについて(計画中)
 
