@@ -1,8 +1,7 @@
 # Carlito
-
-![commit_frequence_badge](https://img.shields.io/github/commit-activity/w/yutadd/Carlito)
+[![commits](https://badgen.net/github/commits/yutadd/Carlito/master)](https://github.com/yutadd/Carlito/commits/main?icon=github&color=green)
 ![last_commit](https://img.shields.io/github/last-commit/yutadd/Carlito)
-![wip](https://img.shields.io/badge/work%20in%20progress-wip-green)
+![wip](https://img.shields.io/badge/work%20in%20progress-wip-yellow)
 
 ## このブロックチェーンについて(計画中)
 
