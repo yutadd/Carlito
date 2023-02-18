@@ -1,23 +1,46 @@
 use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
+use crate::mods::block::block::BLOCKCHAIN;
+use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::console::output::{eprintln, println};
+use crate::mods::network::connection::CONNECTION_LIST;
 use crate::mods::{
     certification::{key_agent, sign_util},
     network::connection,
 };
 use once_cell::sync::Lazy;
-pub static mut PREVIOUS_GENERATOR: Mutex<String> = Mutex::new(String::new()); //ブロック読み込みや受け取り時に更新するべし
+pub static mut PREVIOUS_GENERATOR: String = String::new(); //ブロック読み込みや受け取り時に更新するべし
 pub fn block_generate() {
     loop {
         if connection::is_all_connected() {
-        
             unsafe {
-                if !PREVIOUS_GENERATOR.lock().unwrap().eq(&String::new()) {
+                if !PREVIOUS_GENERATOR.eq(&String::new()) {
                     println(format!("[blockchain_manager]GENERATE BLOCK!"));
                     thread::sleep(Duration::from_secs(1));
                 } else {
                     println(format!("[blockchain_manager]preloaded chain is not ready"));
                     thread::sleep(Duration::from_secs(8));
+                    let mut latest_nodes = 0;
+                    let mut trusted_nodes = 0;
+                    for c in CONNECTION_LIST.iter() {
+                        if c.is_latest {
+                            latest_nodes += 1;
+                        } else {
+                            c.write("{\"type\":\"get_latest\"}\r\n".to_string());
+                        }
+                        if c.is_trusted {
+                            trusted_nodes += 1;
+                        }
+                    }
+                    if latest_nodes == trusted_nodes {
+                        println("[blockchain_manager]all node latest");
+                        PREVIOUS_GENERATOR = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"].to_string();
+                    } else {
+                        println(format!(
+                            "[blockchain_manager]there is not latest node:{}/{}",
+                            latest_nodes, trusted_nodes
+                        ));
+                    }
                 }
             }
         } else {

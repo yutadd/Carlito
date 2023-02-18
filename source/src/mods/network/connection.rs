@@ -17,12 +17,13 @@ use std::{io::BufReader, net::TcpStream};
 static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
 pub static mut CONNECTION_LIST: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
 pub struct Connection {
-    pub isok: Arc<bool>, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
+    pub isok: bool, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,
     pub stream: Arc<TcpStream>,
-    pub is_trusted: Arc<bool>,
+    pub is_trusted: bool,
     pub pubk: Option<PublicKey>,
     pub nonce: Option<String>,
+    pub is_latest: bool,
 }
 impl Clone for Connection {
     fn clone(&self) -> Connection {
@@ -30,9 +31,10 @@ impl Clone for Connection {
             isok: self.isok.clone(),
             id: self.id,
             stream: self.stream.clone(),
-            is_trusted: Arc::new(*self.is_trusted),
+            is_trusted: self.is_trusted.clone(),
             pubk: self.pubk,
             nonce: (&self.nonce).clone(),
+            is_latest: self.is_latest.clone(),
         }
     }
 }
@@ -106,14 +108,18 @@ impl Connection {
                     if verify_result {
                         println(format!("[connection]verifying connection success"));
                         unsafe {
-                            CONNECTION_LIST[get_idx(self.id)].is_trusted = Arc::new(true);
+                            CONNECTION_LIST[get_idx(self.id)].is_trusted = true;
                         }
                         unsafe {
                             println(format!(
                                 "[connection]is trusted:{}",
                                 CONNECTION_LIST[get_idx(self.id)].is_trusted.to_string()
                             ));
+                            CONNECTION_LIST[get_idx(self.id)]
+                                .write("{\"type\":\"get_latest\"}\r\n".to_string());
                         }
+
+                    //すべてのノードに最新のブロックを問い合わせて、最新状態に同期する。
                     } else {
                         println(format!("[connection]failed to verify this connection"));
                     }
@@ -136,17 +142,20 @@ impl Connection {
                             {
                                 if check(json_obj["args"]["block"].clone(), "*".to_string()) {
                                     println(format!(
-                                "[connection]Received lock is correct and taller than my block"
+                                "[connection]Received block is correct and taller than my block"
                             ));
                                 } else {
-                                    eprintln(format!("[connection]Received lock is taller than my block but not correct"));
+                                    eprintln(format!("[connection]Received block is taller than my block but not correct"));
                                 }
                             } else {
                                 eprintln(format!(
-                                    "[connection]Received lock is not taller than my block."
+                                    "[connection]Received block is not taller than my block."
                                 ));
                             }
                         }
+                    }
+                    unsafe {
+                        CONNECTION_LIST[get_idx(self.id)].is_latest = true;
                     }
                 } else {
                     println(format!("[connection]connection received unknown command"));
@@ -166,7 +175,7 @@ pub fn is_all_connected() -> bool {
             if !tk.eq(config::YAML["docker"]["own-pubk"].as_str().unwrap()) {
                 let mut aru = false;
                 for c in CONNECTION_LIST.iter() {
-                    if *c.is_trusted {
+                    if c.is_trusted {
                         if c.pubk.unwrap().to_string().eq(tk) {
                             aru = true;
                             break;
@@ -220,11 +229,12 @@ pub fn init(stream: Arc<TcpStream>) -> Connection {
     }
     Connection {
         id: *COUNT.lock().unwrap(),
-        isok: Arc::new(true),
+        isok: true,
         stream: stream,
-        is_trusted: Arc::new(false),
+        is_trusted: false,
         pubk: Option::None,
         nonce: Option::None,
+        is_latest: false,
     }
 }
 #[test]
