@@ -12,7 +12,7 @@ where
     }
     // https://qiita.com/PruneMazui/items/8a023347772620025ad6
     eprintln!(
-        "[\x1b[31m{}\x1b[m]{}",
+        "[\x1b[31m{}\x1b[m]{}\n",
         &_str[1..index],
         &_str[(index + 1).._str.len()]
     );
@@ -31,7 +31,7 @@ where
     }
     // https://qiita.com/PruneMazui/items/8a023347772620025ad6
     println!(
-        "[\x1b[32m{}\x1b[m]{}",
+        "[\x1b[32m{}\x1b[m]{}\n",
         &_str[1..index],
         &_str[(index + 1).._str.len()]
     );

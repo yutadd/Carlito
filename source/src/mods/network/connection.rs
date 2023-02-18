@@ -117,7 +117,7 @@ impl Connection {
                     println(format!("[connection]connection received unknown command"));
                 }
             }
-            println(format!("{}", line));
+            println(format!("[connection]read_line{}", line));
         }
     }
     pub fn write(&self, context: String) {

@@ -1,6 +1,12 @@
 # Carlito
 
+[![commit_frequence_badge]](https://img.shields.io/github/commit-activity/w/yutadd/Carlito)
+[![last_commit]](https://img.shields.io/github/last-commit/yutadd/Carlito)
+[![wip]](https://img.shields.io/badge/work%20in%20progress-True-green)
+
 ## このブロックチェーンについて(計画中)
+
+
 
 このブロックチェーンは個人開発の、企業向けを想定している PoA 方式のブロックチェーンです。  
 汎用的で強力なブロックチェーンとしてApacheやMysqlなどのように「簡単に使えるバックエンド」の一つとなることを目指しています！
