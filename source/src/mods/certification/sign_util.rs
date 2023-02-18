@@ -1,3 +1,4 @@
+use crate::mods::console::output::{eprintln, println};
 use once_cell::sync::Lazy;
 use secp256k1::hashes::sha256;
 use secp256k1::All;
@@ -36,7 +37,7 @@ pub fn verify_sign(original_message: String, sig: String, public_key: PublicKey)
         SECP.verify_ecdsa(&message, &sig.unwrap(), &public_key)
             .is_ok()
     } else {
-        eprintln!("[sign_util]公開鍵のparseに失敗しました");
+        eprintln(format!("[sign_util]公開鍵のparseに失敗しました"));
         false
     }
 }
@@ -44,7 +45,7 @@ pub fn is_host_trusted(key: String) -> bool {
     let mut exists: bool = false;
     let mut vector_str = "".to_string();
     unsafe {
-        println!("trusted_hosts:{}", TRUSTED_KEY.len());
+        println(format!("[sign_util]trusted_hosts:{}", TRUSTED_KEY.len()));
         for i in 0..TRUSTED_KEY.len() {
             vector_str = format!(
                 "{}{}{}",
@@ -58,7 +59,10 @@ pub fn is_host_trusted(key: String) -> bool {
             }
         }
     }
-    println!("[sign_util]key:{} was {} on [{}]", key, exists, vector_str);
+    println(format!(
+        "[sign_util]key:{} was {} on [{}]",
+        key, exists, vector_str
+    ));
     exists
 }
 #[test]
@@ -78,22 +82,22 @@ fn sign_util_verify() {
     use crate::mods::certification::key_agent;
     key_agent::init();
     let sign = create_sign("HelloWorld".to_string(), *key_agent::get_key(0).unwrap());
-    println!("[sign_util]show sign:{}", sign);
-    println!(
+    println(format!("[sign_util]show sign:{}", sign));
+    println(format!(
         "[sign_util]verify sign:{}",
         verify_sign(
             "HelloWorld".to_string(),
             sign.to_string(),
             key_agent::get_key(0).unwrap().public_key(&SECP)
         )
-    );
-    println!(
+    ));
+    println(format!(
         "[sign_util]verify wrong message:{}",
         verify_sign(
             "HelloWorld01".to_string(),
             sign.to_string(),
             key_agent::get_key(0).unwrap().public_key(&SECP)
         )
-    );
-    println!("[sign_util]end_test_signeture");
+    ));
+    println(format!("[sign_util]end_test_signeture"));
 }

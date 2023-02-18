@@ -1,11 +1,11 @@
 use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
-use once_cell::sync::Lazy;
-
+use crate::mods::console::output::{eprintln, println};
 use crate::mods::{
     certification::{key_agent, sign_util},
     network::connection,
 };
+use once_cell::sync::Lazy;
 pub static mut PREVIOUS_GENERATOR: Mutex<String> = Mutex::new(String::new()); //ブロック読み込みや受け取り時に更新するべし
 
 pub fn block_generate() {
@@ -13,15 +13,17 @@ pub fn block_generate() {
         if connection::is_all_connected() {
             unsafe {
                 if !PREVIOUS_GENERATOR.lock().unwrap().eq(&String::new()) {
-                    println!("[blockchain_manager]GENERATE BLOCK!");
+                    println(format!("[blockchain_manager]GENERATE BLOCK!"));
                     thread::sleep(Duration::from_secs(1));
                 } else {
-                    println!("[blockchain_manager]preloaded chain is not ready");
+                    println(format!("[blockchain_manager]preloaded chain is not ready"));
                     thread::sleep(Duration::from_secs(8));
                 }
             }
         } else {
-            println!("[blockchain_manager]waiting connection for start generate block.");
+            println(format!(
+                "[blockchain_manager]waiting connection for start generate block."
+            ));
             thread::sleep(Duration::from_secs(8));
         }
     }
@@ -38,7 +40,7 @@ pub fn get_next_generator(
             };
         }
     }
-    eprintln!("[blockchain_manager]trusted_key has no value");
+    eprintln(format!("[blockchain_manager]trusted_key has no value"));
     return String::new();
 }
 #[test]

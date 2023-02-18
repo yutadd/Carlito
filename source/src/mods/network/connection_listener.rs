@@ -1,6 +1,7 @@
 use super::super::config::config::YAML;
 use super::connection;
 use super::connection::CONNECTION_LIST;
+use crate::mods::console::output::{eprintln, println};
 use std::net::TcpListener;
 use std::sync::Arc;
 use std::thread;
@@ -15,9 +16,9 @@ pub fn run() {
         );
     }
     let listener = TcpListener::bind(bind_target).expect("Error: Failed to bind");
-    println!("[connection_listener]Listening...");
+    println(format!("[connection_listener]Listening..."));
     for streams in listener.incoming() {
-        println!("[connection_listener]connection incoming!");
+        println(format!("[connection_listener]connection incoming!"));
         let streams = streams.unwrap();
         unsafe {
             let user = connection::init(Arc::new(streams));

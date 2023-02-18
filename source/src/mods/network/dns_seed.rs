@@ -2,6 +2,7 @@
 use super::super::config::config;
 use super::connection;
 use super::connection::CONNECTION_LIST;
+use crate::mods::console::output::{eprintln, println};
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
 use std::net::TcpStream;
@@ -30,14 +31,14 @@ pub static CLIENT: Lazy<SyncClient<UdpClientConnection>> = Lazy::new(|| unsafe {
 });
 
 fn get_addr(name: String) -> Vec<Ipv4Addr> {
-    println!("[dns_seed]request resolv: {}", name);
+    println(format!("[dns_seed]request resolv: {}", name));
     let name = Name::from_str(name.as_str()).unwrap();
     let response: DnsResponse = CLIENT.query(&name, DNSClass::IN, RecordType::A).unwrap();
     let mut v = Vec::new();
     for answor in response.answers() {
         if let Some(RData::A(addr)) = answor.data() {
             v.push(*addr);
-            println!("[dns_seed]fetched seeds addr: {}", *addr);
+            println(format!("[dns_seed]fetched seeds addr: {}", *addr));
         }
     }
     v
@@ -63,7 +64,7 @@ pub fn init() {
                         connection = stream;
                     }
                     Err(error) => {
-                        println!("[dns_seed]未接続:{}", error.kind());
+                        println(format!("[dns_seed]未接続:{}", error.kind()));
                         continue;
                     }
                 }
@@ -102,7 +103,7 @@ pub fn init() {
                     connection = stream;
                 }
                 Err(error) => {
-                    println!("[dns_seed]未接続:{}", error.kind());
+                    println(format!("[dns_seed]未接続:{}", error.kind()));
                     continue;
                 }
             }
@@ -121,5 +122,5 @@ pub fn init() {
 #[test]
 fn dns_seed_fetch() {
     let addrs = get_addr("amazon.com".to_string());
-    println!("[dns_seed]sum:{}", addrs.len());
+    println(format!("[dns_seed]sum:{}", addrs.len()));
 }

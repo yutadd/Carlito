@@ -1,3 +1,4 @@
+use crate::mods::console::output::{eprintln, println};
 use mods::certification::key_agent;
 use mods::certification::sign_util;
 use mods::network::connection_listener;
@@ -21,21 +22,21 @@ TODO: ノード間TLS通信<br />
 TODO: プロキシへの対応<br />
 */
 fn main() {
-    println!("[main]Initializing...");
+    println(format!("[main]Initializing..."));
     key_agent::init();
     sign_util::init();
     thread::spawn(|| {
         connection_listener::run();
-        println!("[main]thread-Inited");
+        println(format!("[main]thread-Inited"));
     });
     dns_seed::init();
     thread::spawn(|| blockchain_manager::block_generate());
-    println!("[main]Inited");
+    println(format!("[main]Inited"));
     loop {
         let line = &mut String::new();
         let size = stdin().read_line(line).unwrap();
         if size > 0 {
-            println!("[main]your input:{}", line);
+            println(format!("[main]your input:{}", line));
         }
     }
 }

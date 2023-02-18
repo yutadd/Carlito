@@ -1,4 +1,5 @@
 extern crate yaml_rust;
+use crate::mods::console::output::{eprintln, println};
 use once_cell::sync::Lazy;
 use std::fs;
 use yaml_rust::{Yaml, YamlLoader};
@@ -10,9 +11,9 @@ pub static mut YAML: Lazy<Yaml> = Lazy::new(|| {
 #[test]
 fn config_init() {
     unsafe {
-        println!(
-            "unsafe config getter:{}",
+        println(format!(
+            "[config]unsafe config getter:{}",
             YAML["network"]["domain"].as_str().unwrap()
-        );
+        ));
     }
 }

@@ -1,3 +1,4 @@
+use crate::mods::console::output::{eprintln, println};
 use chrono::{DateTime, Utc};
 use json::{array, object, JsonValue};
 use once_cell::sync::Lazy;
@@ -20,9 +21,10 @@ use crate::mods::{
 pub static genesis_block_hash: &str =
     "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D";
 pub static tx_per_file: usize = 100;
-//pub static mut BLOCKCHAIN: Lazy<Vec<Block>> = Lazy::new(|| Vec::new());
+pub static mut BLOCKCHAIN: Lazy<Vec<JsonValue>> = Lazy::new(|| Vec::new());
 
 pub fn check(block: JsonValue) -> bool {
+    println(format!("[block]dumped_full_block:{}", block.dump()));
     let block_without_sign = object![
         previous_hash:block["previous_hash"].to_string(),
         author:block["author"].to_string(),
@@ -30,15 +32,15 @@ pub fn check(block: JsonValue) -> bool {
         height:block["height"].to_string().parse::<usize>().unwrap(),
         transactions:block["transactions"].clone(),
     ];
-    println!("[block]verifying block:{}", block_without_sign);
+    println(format!("[block]verifying block:{}", block_without_sign));
     let mut any_invalid_ts = false;
     for t in block_without_sign["transactions"].members() {
-        println!("[block]verifying transaction:{}", t);
+        println(format!("[block]verifying transaction:{}", t));
         if !transaction::check(t.clone()) {
             any_invalid_ts = true;
-            println!("[block]invalid transaction:{}", t)
+            println(format!("[block]invalid transaction:{}", t))
         } else {
-            println!("[block]perfect transaction:{}", t)
+            println(format!("[block]perfect transaction:{}", t))
         }
     }
     if !any_invalid_ts {
@@ -48,7 +50,7 @@ pub fn check(block: JsonValue) -> bool {
             PublicKey::from_str(block_without_sign["author"].as_str().unwrap()).unwrap(),
         )
     } else {
-        println!("[block]threre is invalid transaction");
+        println(format!("[block]threre is invalid transaction"));
         false
     }
 }
@@ -74,16 +76,20 @@ pub fn read_block_from_local() -> usize {
     let mut last_block_height = 0;
     create_directory_if_not_exists();
     loop {
-        println!("[block]entered a loop");
+        println(format!("[block]entered a loop"));
         i += 1;
         let f: File;
         match OpenOptions::new()
             .read(true)
-            .open(format!("Blocks/Block-{}.txt", i))
+            .open(format!("Blocks/Block-{}.json", i))
         {
-            Ok(_f) => f = _f,
+            Ok(_f) => {
+                f = _f;
+                println(format!("[block]there is block"))
+            }
             Err(e) => {
-                println!("[block]ERR:{}", e);
+                println(format!("[block]ERR:{}", e));
+                i -= 1;
                 break;
             }
         };
@@ -91,22 +97,21 @@ pub fn read_block_from_local() -> usize {
         for line in reader.lines() {
             let line = line.unwrap();
             if line.eq("") {
-                println!("[block]found EOF");
+                println(format!("[block]found EOF"));
                 break; //読み込み途中で""になったということはブロックはここまでであり、これ以上ブロックファイルも存在しないはずなので、loopも抜ける。
             } else {
-                println!("[block]readed line:{}", line);
-                last_block_height = 1;
-                /*let _block = from_str(line);
-                assert!(_block.check());
-
-                println!("height:{}", last_block_height);
+                println(format!("[block]readed line:{}", line));
+                let _block = json::parse(line.as_str()).unwrap();
+                assert!(check(_block.clone()));
+                last_block_height = _block["height"].as_usize().unwrap();
+                println(format!("[block]height:{}", last_block_height));
                 unsafe {
                     BLOCKCHAIN.push(_block);
-                }*/
+                }
             }
         }
     }
-    //assert_eq!(get_file_and_index(last_block_height).0, i - 1);
+    assert_eq!(get_file_and_index(last_block_height).0, i);
     i
 }
 pub fn get_file_and_index(height: usize) -> (usize, usize) {
@@ -133,12 +138,12 @@ pub fn parsing_json() {
         transactions:example_transactions,
     ];
     let dumped_json = example_block.dump();
-    println!("[block]dumped_block:{}", dumped_json);
+    println(format!("[block]dumped_block:{}", dumped_json));
     unsafe {
-        println!(
+        println(format!(
             "[block]created_block_sign:{}",
             create_sign(dumped_json, key_agent::SECRET[0])
-        )
+        ))
     }
     let check_result=check(json::parse("{
         \"previous_hash\":\"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D\",
@@ -152,7 +157,7 @@ pub fn parsing_json() {
             \"sign\":\"3045022100c4d6d23647dcbdbd1bf9f7abdbd2c427e6d0b732db4633f9fa6ceecdaa5f317b022013c8aba9606e48a5be1eebad06475fb5baeb1e92cd4059c10ee6507c9d38587a\"}
             ],
         \"sign\":\"304402200ca1d60f83187635da209bc7521dbd96fc896b740e8c3589c4462c2ce2ca70ac02206488ec6b7ea6d55eecd32a70ec5b89538e235e5452b09d4b254911b7d9d913cd\"}").unwrap());
-    println!("[block]check_example_block:{}", check_result);
+    println(format!("[block]check_example_block:{}", check_result));
     assert!(check_result);
 }
 

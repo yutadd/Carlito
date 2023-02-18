@@ -2,6 +2,7 @@ use crate::mods::config::config;
 
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
+use crate::mods::console::output::{eprintln, println};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use secp256k1::PublicKey;
@@ -39,7 +40,7 @@ impl Connection {
             let mut line = String::new();
             let bytes = reader.read_line(&mut line).unwrap();
             if bytes == 0 {
-                println!("[connection]接続終了");
+                println(format!("[connection]接続終了"));
                 unsafe {
                     CONNECTION_LIST.remove(get_idx(self.id));
                 }
@@ -47,7 +48,10 @@ impl Connection {
             } else {
                 let json_obj = json::parse(&line).unwrap();
                 if json_obj["type"].eq("hello") {
-                    println!("[connection]received pubk is {}", json_obj["args"]["pubk"]);
+                    println(format!(
+                        "[connection]received pubk is {}",
+                        json_obj["args"]["pubk"]
+                    ));
                     unsafe {
                         CONNECTION_LIST[get_idx(self.id)].pubk = Option::Some(
                             PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
@@ -69,7 +73,9 @@ impl Connection {
                             CONNECTION_LIST[get_idx(self.id)].nonce =
                                 Option::Some(format!("{}", generated_rand));
                         } else {
-                            println!("[connection]connection dropped out for wrong pubk.");
+                            println(format!(
+                                "[connection]connection dropped out for wrong pubk."
+                            ));
                         }
                     }
                 } else if json_obj["type"].eq("req_sign") {
@@ -82,7 +88,7 @@ impl Connection {
                             "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
                             sign.to_string()
                         ));
-                        println!("[connection]sign was sent");
+                        println(format!("[connection]sign was sent"));
                     }
                 } else if json_obj["type"].eq("signed") {
                     let verify_result;
@@ -94,24 +100,24 @@ impl Connection {
                         );
                     }
                     if verify_result {
-                        println!("[connection]verifying connection success");
+                        println(format!("[connection]verifying connection success"));
                         unsafe {
                             CONNECTION_LIST[get_idx(self.id)].is_trusted = Arc::new(true);
                         }
                         unsafe {
-                            println!(
+                            println(format!(
                                 "[connection]is trusted:{}",
                                 CONNECTION_LIST[get_idx(self.id)].is_trusted.to_string()
-                            );
+                            ));
                         }
                     } else {
-                        println!("[connection]failed to verify this connection");
+                        println(format!("[connection]failed to verify this connection"));
                     }
                 } else {
-                    println!("[connection]connection received unknown command");
+                    println(format!("[connection]connection received unknown command"));
                 }
             }
-            println!("{}", line);
+            println(format!("{}", line));
         }
     }
     pub fn write(&self, context: String) {
@@ -134,11 +140,11 @@ pub fn is_all_connected() -> bool {
                     }
                 }
                 if !aru {
-                    println!("[connection]there is not connected node");
-                    println!("[connection]not connected node:{}", tk);
+                    println(format!("[connection]there is not connected node"));
+                    println(format!("[connection]not connected node:{}", tk));
                     return false;
                 } else {
-                    println!("[connection]ok, already connected");
+                    println(format!("[connection]ok, already connected"));
                 }
             }
         }
@@ -172,11 +178,11 @@ pub fn init(stream: Arc<TcpStream>) -> Connection {
             .unwrap();
         (&*stream).flush().unwrap();
 
-        println!(
+        println(format!(
             "[connection]secret:{}\n[connection]sent pubk:{}",
             key_agent::SECRET[0].display_secret(),
             key
-        )
+        ))
     }
     Connection {
         id: *COUNT.lock().unwrap(),
