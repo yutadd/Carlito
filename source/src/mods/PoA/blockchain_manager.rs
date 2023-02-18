@@ -7,10 +7,10 @@ use crate::mods::{
 };
 use once_cell::sync::Lazy;
 pub static mut PREVIOUS_GENERATOR: Mutex<String> = Mutex::new(String::new()); //ブロック読み込みや受け取り時に更新するべし
-
 pub fn block_generate() {
     loop {
         if connection::is_all_connected() {
+        
             unsafe {
                 if !PREVIOUS_GENERATOR.lock().unwrap().eq(&String::new()) {
                     println(format!("[blockchain_manager]GENERATE BLOCK!"));
