@@ -1,7 +1,10 @@
 use crate::mods::console::output::{eprintln, println};
+use crate::mods::network::connection;
 use chrono::{DateTime, Utc};
 use json::{array, object, JsonValue};
 use once_cell::sync::Lazy;
+use secp256k1::hashes::sha256;
+use secp256k1::Message;
 use secp256k1::{ecdsa::Signature, PublicKey};
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -23,7 +26,7 @@ pub static genesis_block_hash: &str =
 pub static tx_per_file: usize = 100;
 pub static mut BLOCKCHAIN: Lazy<Vec<JsonValue>> = Lazy::new(|| Vec::new());
 
-pub fn check(block: JsonValue) -> bool {
+pub fn check(block: JsonValue, previous_hash: String) -> bool {
     println(format!("[block]dumped_full_block:{}", block.dump()));
     let block_without_sign = object![
         previous_hash:block["previous_hash"].to_string(),
@@ -32,25 +35,34 @@ pub fn check(block: JsonValue) -> bool {
         height:block["height"].to_string().parse::<usize>().unwrap(),
         transactions:block["transactions"].clone(),
     ];
-    println(format!("[block]verifying block:{}", block_without_sign));
-    let mut any_invalid_ts = false;
-    for t in block_without_sign["transactions"].members() {
-        println(format!("[block]verifying transaction:{}", t));
-        if !transaction::check(t.clone()) {
-            any_invalid_ts = true;
-            println(format!("[block]invalid transaction:{}", t))
-        } else {
-            println(format!("[block]perfect transaction:{}", t))
+    if previous_hash.eq(&block["previous_hash"].to_string()) {
+        println(format!("[block]verifying block:{}", block_without_sign));
+        let mut any_invalid_ts = false;
+        for t in block_without_sign["transactions"].members() {
+            println(format!("[block]verifying transaction:{}", t));
+            if !transaction::check(t.clone()) {
+                any_invalid_ts = true;
+                eprintln(format!("[block]invalid transaction:{}", t))
+            } else {
+                println(format!("[block]perfect transaction:{}", t))
+            }
         }
-    }
-    if !any_invalid_ts {
-        sign_util::verify_sign(
-            block_without_sign.dump(),
-            block["sign"].to_string(),
-            PublicKey::from_str(block_without_sign["author"].as_str().unwrap()).unwrap(),
-        )
+        if !any_invalid_ts {
+            sign_util::verify_sign(
+                block_without_sign.dump(),
+                block["sign"].to_string(),
+                PublicKey::from_str(block_without_sign["author"].as_str().unwrap()).unwrap(),
+            )
+        } else {
+            eprintln(format!("[block]threre is invalid transaction"));
+            false
+        }
     } else {
-        println(format!("[block]threre is invalid transaction"));
+        eprintln(format!(
+            "previous hash:{} not match:{}",
+            previous_hash,
+            block["previous_hash"].to_string()
+        ));
         false
     }
 }
@@ -71,7 +83,8 @@ pub fn append_block(text: String) {
 pub fn create_directory_if_not_exists() {
     fs::create_dir_all("Blocks/").unwrap();
 }
-pub fn read_block_from_local() -> usize {
+pub fn read_block_from_local() {
+    let mut previous = genesis_block_hash.to_string();
     let mut i: usize = 0;
     let mut last_block_height = 0;
     create_directory_if_not_exists();
@@ -102,7 +115,11 @@ pub fn read_block_from_local() -> usize {
             } else {
                 println(format!("[block]readed line:{}", line));
                 let _block = json::parse(line.as_str()).unwrap();
-                assert!(check(_block.clone()));
+                let _prev = previous.clone();
+                assert!(check(_block.clone(), _prev.to_string()));
+                let hash = Message::from_hashed_data::<sha256::Hash>(_block.dump().as_bytes());
+                println(format!("[block]dump block hash:{}", hash.clone()));
+                previous = hash.to_string();
                 last_block_height = _block["height"].as_usize().unwrap();
                 println(format!("[block]height:{}", last_block_height));
                 unsafe {
@@ -112,10 +129,17 @@ pub fn read_block_from_local() -> usize {
         }
     }
     assert_eq!(get_file_and_index(last_block_height).0, i);
-    i
+    unsafe {
+        assert!(BLOCKCHAIN.len() > 0);
+    }
+    unsafe {
+        for c in connection::CONNECTION_LIST.iter() {
+            c.write("{\"type\":\"get_latest\"}\r\n".to_string());
+        }
+    }
 }
 pub fn get_file_and_index(height: usize) -> (usize, usize) {
-    //assert!(height > 0);
+    assert!(height > 0);
     return ((height / tx_per_file) + 1, height % tx_per_file);
 }
 
@@ -156,7 +180,7 @@ pub fn parsing_json() {
             \"text_b64\":\"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx\",
             \"sign\":\"3045022100c4d6d23647dcbdbd1bf9f7abdbd2c427e6d0b732db4633f9fa6ceecdaa5f317b022013c8aba9606e48a5be1eebad06475fb5baeb1e92cd4059c10ee6507c9d38587a\"}
             ],
-        \"sign\":\"304402200ca1d60f83187635da209bc7521dbd96fc896b740e8c3589c4462c2ce2ca70ac02206488ec6b7ea6d55eecd32a70ec5b89538e235e5452b09d4b254911b7d9d913cd\"}").unwrap());
+        \"sign\":\"304402200ca1d60f83187635da209bc7521dbd96fc896b740e8c3589c4462c2ce2ca70ac02206488ec6b7ea6d55eecd32a70ec5b89538e235e5452b09d4b254911b7d9d913cd\"}").unwrap(),"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D".to_string());
     println(format!("[block]check_example_block:{}", check_result));
     assert!(check_result);
 }

@@ -1,4 +1,7 @@
+use crate::mods::block::block::check;
+use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::config::config;
+use crate::mods::PoA::blockchain_manager::PREVIOUS_GENERATOR;
 
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
@@ -46,6 +49,7 @@ impl Connection {
                 }
                 break;
             } else {
+                println(format!("[connection]read_line{}", line));
                 let json_obj = json::parse(&line).unwrap();
                 if json_obj["type"].eq("hello") {
                     println(format!(
@@ -113,11 +117,41 @@ impl Connection {
                     } else {
                         println(format!("[connection]failed to verify this connection"));
                     }
+                } else if json_obj["type"].eq("get_latest") {
+                    unsafe {
+                        if BLOCKCHAIN.len() > 0 {
+                            self.write(format!(
+                                "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                                BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
+                            ));
+                        }
+                    }
+                } else if json_obj["type"].eq("block") {
+                    unsafe {
+                        if BLOCKCHAIN.len() > 0 {
+                            if json_obj["args"]["block"]["height"].as_usize().unwrap()
+                                > BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
+                                    .as_usize()
+                                    .unwrap()
+                            {
+                                if check(json_obj["args"]["block"].clone(), "*".to_string()) {
+                                    println(format!(
+                                "[connection]Received lock is correct and taller than my block"
+                            ));
+                                } else {
+                                    eprintln(format!("[connection]Received lock is taller than my block but not correct"));
+                                }
+                            } else {
+                                eprintln(format!(
+                                    "[connection]Received lock is not taller than my block."
+                                ));
+                            }
+                        }
+                    }
                 } else {
                     println(format!("[connection]connection received unknown command"));
                 }
             }
-            println(format!("[connection]read_line{}", line));
         }
     }
     pub fn write(&self, context: String) {

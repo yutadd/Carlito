@@ -22,7 +22,7 @@ pub fn run() {
         let streams = streams.unwrap();
         unsafe {
             let user = connection::init(Arc::new(streams));
-            let mut user2 = user.clone();
+            let user2 = user.clone();
             CONNECTION_LIST.push(user);
             thread::spawn(move || user2.read_thread());
         }
