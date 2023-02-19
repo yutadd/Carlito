@@ -8,7 +8,7 @@ use crate::mods::console::output::{eprintln, println};
 use base64::Engine;
 use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
 use json::{object, JsonValue};
-use secp256k1::{ecdsa::Signature, PublicKey};
+use secp256k1::{ecdsa::Signature, PublicKey, SecretKey};
 
 pub fn check(transaction: JsonValue) -> bool {
     let transaction_without_sign = object![
@@ -28,31 +28,33 @@ pub fn check(transaction: JsonValue) -> bool {
 */
 
 #[test]
-pub fn parsing_json() {
-    key_agent::init();
-    sign_util::init();
-    let example_transaction = object![
-        author:"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908".to_string(),
+pub fn create_transaction() {
+    let mut example_transaction = object![
+        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
         date:1676449733,
         text_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
     ];
     let dumped_json = example_transaction.dump();
     println(format!("[transaction]dumped_transaction:{}", dumped_json));
-    unsafe {
-        println(format!(
-            "[transaction]created_transaction_sign:{}",
-            create_sign(dumped_json, key_agent::SECRET[0])
-        ))
-    }
-    let check_result=check(json::parse("{
-    \"author\":\"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908\",
-    \"date\":1676449733,
-    \"text_b64\":\"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx\",
-    \"sign\":\"3045022100c4d6d23647dcbdbd1bf9f7abdbd2c427e6d0b732db4633f9fa6ceecdaa5f317b022013c8aba9606e48a5be1eebad06475fb5baeb1e92cd4059c10ee6507c9d38587a\"
-}").unwrap());
+    example_transaction
+        .insert(
+            "sign",
+            create_sign(
+                dumped_json,
+                SecretKey::from_str(
+                    "c2b56c7e50a19fbdd8fe5546fb21d2d7cb60c5fe95cd719bc64ba1fbf0bec955",
+                )
+                .unwrap(),
+            )
+            .to_string(),
+        )
+        .unwrap();
     println(format!(
-        "[transaction]check_example_transaction:{}",
-        check_result
+        "[transaction]created_transaction_full:{}",
+        example_transaction.dump()
     ));
-    assert!(check_result);
+    println(format!(
+        "[transaction]check created transaction:{}",
+        check(example_transaction)
+    ));
 }
