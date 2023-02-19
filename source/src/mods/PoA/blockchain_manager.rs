@@ -9,7 +9,9 @@ use crate::mods::{
     certification::{key_agent, sign_util},
     network::connection,
 };
+use json::JsonValue;
 use once_cell::sync::Lazy;
+pub static mut TRANSACTION_POOL: Lazy<Vec<JsonValue>> = Lazy::new(|| Vec::new());
 pub static mut PREVIOUS_GENERATOR: isize = -1; //ブロック読み込みや受け取り時に更新するべし
 pub fn block_generate() {
     loop {
