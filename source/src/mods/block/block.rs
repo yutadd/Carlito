@@ -4,8 +4,8 @@ use chrono::{DateTime, Utc};
 use json::{array, object, JsonValue};
 use once_cell::sync::Lazy;
 use secp256k1::hashes::sha256;
-use secp256k1::Message;
 use secp256k1::{ecdsa::Signature, PublicKey};
+use secp256k1::{Message, SecretKey};
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::ops::IndexMut;
@@ -139,47 +139,41 @@ pub fn get_file_and_index(height: usize) -> (usize, usize) {
 }
 
 #[test]
-pub fn parsing_json() {
-    key_agent::init();
-    sign_util::init();
+pub fn create_block() {
     let example_transaction = object![
-        author:"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908".to_string(),
+        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
         date:1676449733,
         text_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
-        sign:"3045022100c4d6d23647dcbdbd1bf9f7abdbd2c427e6d0b732db4633f9fa6ceecdaa5f317b022013c8aba9606e48a5be1eebad06475fb5baeb1e92cd4059c10ee6507c9d38587a"
+        sign:"304402207cd4924d4a95edf7d457bfad0ae5b7711e0c6ac7eb3087585dea80c743ae23d202205fe2b56c4aef3890fa7655566f8dd182ac16f1c4ffb7fb8a6f6c39eaa377dfda"
     ];
     let example_transactions = array![example_transaction];
-    let example_block = object![
+    let mut example_block = object![
         previous_hash:"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D".to_string(),
-        author:"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908".to_string(),
+        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
         date:1676449733,
         height:1,
         transactions:example_transactions,
     ];
     let dumped_json = example_block.dump();
-    println(format!("[block]dumped_block:{}", dumped_json));
-    unsafe {
-        println(format!(
-            "[block]created_block_sign:{}",
-            create_sign(dumped_json, key_agent::SECRET[0])
-        ))
-    }
-    let check_result=check(json::parse("{
-        \"previous_hash\":\"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D\",
-        \"author\":\"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908\",
-        \"date\":1676449733,
-        \"height\":1,
-        \"transactions\":[{
-            \"author\":\"026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908\",
-            \"date\":1676449733,
-            \"text_b64\":\"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx\",
-            \"sign\":\"3045022100c4d6d23647dcbdbd1bf9f7abdbd2c427e6d0b732db4633f9fa6ceecdaa5f317b022013c8aba9606e48a5be1eebad06475fb5baeb1e92cd4059c10ee6507c9d38587a\"}
-            ],
-        \"sign\":\"304402200ca1d60f83187635da209bc7521dbd96fc896b740e8c3589c4462c2ce2ca70ac02206488ec6b7ea6d55eecd32a70ec5b89538e235e5452b09d4b254911b7d9d913cd\"}").unwrap(),"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D".to_string());
-    println(format!("[block]check_example_block:{}", check_result));
-    assert!(check_result);
+    let sign = create_sign(
+        dumped_json,
+        SecretKey::from_str("c2b56c7e50a19fbdd8fe5546fb21d2d7cb60c5fe95cd719bc64ba1fbf0bec955")
+            .unwrap(),
+    )
+    .to_string();
+    example_block.insert("sign", sign).unwrap();
+    println(format!(
+        "[block]created block full:{}",
+        example_block.dump()
+    ));
+    println(format!(
+        "[block]check created block:{}",
+        check(
+            example_block,
+            "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D".to_string()
+        )
+    ));
 }
-
 #[test]
 pub fn get_index() {
     assert_eq!(get_file_and_index(1).0, 1);

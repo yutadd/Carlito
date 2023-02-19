@@ -15,7 +15,7 @@ pub fn block_generate() {
         if connection::is_all_connected() {
             unsafe {
                 if !PREVIOUS_GENERATOR.eq(&String::new()) {
-                    println(format!("[blockchain_manager]GENERATE BLOCK!"));
+                    println(format!("[blockchain_manager]GENERATING BLOCK!"));
                     thread::sleep(Duration::from_secs(1));
                 } else {
                     println(format!("[blockchain_manager]preloaded chain is not ready"));

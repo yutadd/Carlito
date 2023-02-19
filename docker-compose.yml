@@ -12,6 +12,7 @@ services:
       dockerfile: ./Docker/Node/Dockerfile
       context: ./
     volumes:
+      - ./Docker/Node/01/Blocks/:/root/Carlito/Blocks/
       - ./source/:/root/Carlito/source
       - ./Docker/Node/01/:/root/Carlito/Config/
       - ./Docker/Node/01/secret:/root/Carlito/secret/
@@ -25,6 +26,7 @@ services:
       dockerfile: ./Docker/Node/Dockerfile
       context: ./
     volumes:
+      - ./Docker/Node/02/Blocks/:/root/Carlito/Blocks/
       - ./source/:/root/Carlito/source
       - ./Docker/Node/02/:/root/Carlito/Config/
       - ./Docker/Node/02/secret:/root/Carlito/secret/
@@ -40,6 +42,7 @@ services:
       dockerfile: ./Docker/Node/Dockerfile
       context: ./
     volumes:
+      - ./Docker/Node/03/Blocks/:/root/Carlito/Blocks/
       - ./source/:/root/Carlito/source
       - ./Docker/Node/03/:/root/Carlito/Config/
       - ./Docker/Node/03/secret:/root/Carlito/secret/
