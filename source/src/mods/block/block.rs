@@ -1,4 +1,4 @@
-use crate::mods::console::output::{eprintln, println};
+use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::network::connection;
 use chrono::{DateTime, Utc};
 use json::{array, object, JsonValue};
@@ -42,7 +42,6 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
     if previous_hash.eq(&block["previous_hash"].to_string())
         || block["previous_hash"].to_string().eq("*")
     {
-        println(format!("[block]verifying block:{}", block_without_sign));
         let mut any_invalid_ts = false;
         for t in block_without_sign["transactions"].members() {
             println(format!("[block]verifying transaction:{}", t));
@@ -107,7 +106,10 @@ pub fn read_block_from_local() {
                 println(format!("[block]there is block"))
             }
             Err(e) => {
-                println(format!("[block]ERR:{}", e));
+                wprintln(format!(
+                    "[block]Reading file is Completed or there are some error:{}",
+                    e
+                ));
                 i -= 1;
                 break;
             }

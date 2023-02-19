@@ -1,12 +1,11 @@
+use super::super::certification::key_agent;
+use super::super::certification::sign_util;
 use crate::mods::block::block::check;
 use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::config::config;
-use crate::mods::PoA::blockchain_manager::PREVIOUS_GENERATOR;
-
-use super::super::certification::key_agent;
-use super::super::certification::sign_util;
 use crate::mods::console::output::{eprintln, println};
+use crate::mods::PoA::blockchain_manager::PREVIOUS_GENERATOR;
 use async_std::sync;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -18,6 +17,8 @@ use std::net::Shutdown;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use std::{io::BufReader, net::TcpStream};
 static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
 pub static mut CONNECTION_LIST: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
@@ -224,9 +225,17 @@ impl Connection {
         }
     }
     pub fn write(&self, context: String) {
-        if self.isok {
-            (&*self.stream).write_all(context.as_bytes()).unwrap();
-            (&*self.stream).flush().unwrap();
+        unsafe {
+            if self.isok {
+                loop {
+                    if !is_blocked {
+                        break;
+                    }
+                    thread::sleep(Duration::from_secs(1));
+                }
+                (&*self.stream).write_all(context.as_bytes()).unwrap();
+                (&*self.stream).flush().unwrap();
+            }
         }
     }
 }
@@ -247,8 +256,6 @@ pub fn is_all_connected() -> bool {
                     println(format!("[connection]there is not connected node"));
                     println(format!("[connection]not connected node:{}", tk));
                     return false;
-                } else {
-                    println(format!("[connection]ok, already connected"));
                 }
             }
         }
