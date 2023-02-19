@@ -19,8 +19,12 @@ use crate::mods::certification::sign_util::create_sign;
 use crate::mods::{
     certification::{key_agent, sign_util},
     transaction::transaction,
-    transaction::transactions,
 };
+
+/**
+ * /Blocks/に最低１ブロックはなければならない。
+ *
+*/
 pub static genesis_block_hash: &str =
     "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D";
 pub static tx_per_file: usize = 100;
@@ -59,7 +63,7 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         }
     } else {
         eprintln(format!(
-            "previous hash:{} not match:{}",
+            "[block]previous hash:{} not match:{}",
             previous_hash,
             block["previous_hash"].to_string()
         ));

@@ -1,7 +1,8 @@
 use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
-use crate::mods::block::block::BLOCKCHAIN;
-use crate::mods::certification::sign_util::{SECP, TRUSTED_KEY};
+use crate::mods::block::block::{check, BLOCKCHAIN};
+use crate::mods::certification::key_agent::SECRET;
+use crate::mods::certification::sign_util::{create_sign, SECP, TRUSTED_KEY};
 use crate::mods::config::config::YAML;
 use crate::mods::console::output::{eprintln, println};
 use crate::mods::network::connection::CONNECTION_LIST;
@@ -9,8 +10,11 @@ use crate::mods::{
     certification::{key_agent, sign_util},
     network::connection,
 };
-use json::JsonValue;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use json::{array, object, JsonValue};
 use once_cell::sync::Lazy;
+use secp256k1::hashes::sha256;
+use secp256k1::Message;
 pub static mut TRANSACTION_POOL: Lazy<Vec<JsonValue>> = Lazy::new(|| Vec::new());
 pub static mut PREVIOUS_GENERATOR: isize = -1; //ブロック読み込みや受け取り時に更新するべし
 pub fn block_generate() {
@@ -29,7 +33,30 @@ pub fn block_generate() {
                         .unwrap()
                         .eq(&key_agent::SECRET[0].public_key(&SECP).to_string())
                     {
-                        println(format!("[blockchain_manager]GENERATING BLOCK!"));
+                        let mut block = object![
+                            previous_hash:Message::from_hashed_data::<sha256::Hash>(BLOCKCHAIN[BLOCKCHAIN.len()-1].dump().as_bytes()).to_string(),
+                            author:SECRET[0].public_key(&SECP).to_string(),
+                            date:Utc::now().timestamp_millis(),
+                            height:BLOCKCHAIN[BLOCKCHAIN.len()-1]["height"].as_usize().unwrap()+1,
+                            transactions:array![],
+                        ];
+                        block
+                            .insert("sign", create_sign(block.dump(), SECRET[0]).to_string())
+                            .unwrap();
+                        assert!(check(
+                            block.clone(),
+                            Message::from_hashed_data::<sha256::Hash>(
+                                BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                            )
+                            .to_string(),
+                        ));
+                        println("[blockchain_manager]block generated successfully");
+                        for c in CONNECTION_LIST.iter() {
+                            c.write(format!(
+                                "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                                block.dump()
+                            ));
+                        }
                     }
                     thread::sleep(Duration::from_secs(1));
                 } else {
