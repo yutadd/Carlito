@@ -1,7 +1,8 @@
 use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
 use crate::mods::block::block::BLOCKCHAIN;
-use crate::mods::certification::sign_util::TRUSTED_KEY;
+use crate::mods::certification::sign_util::{SECP, TRUSTED_KEY};
+use crate::mods::config::config::YAML;
 use crate::mods::console::output::{eprintln, println};
 use crate::mods::network::connection::CONNECTION_LIST;
 use crate::mods::{
@@ -9,13 +10,25 @@ use crate::mods::{
     network::connection,
 };
 use once_cell::sync::Lazy;
-pub static mut PREVIOUS_GENERATOR: String = String::new(); //ブロック読み込みや受け取り時に更新するべし
+pub static mut PREVIOUS_GENERATOR: isize = -1; //ブロック読み込みや受け取り時に更新するべし
 pub fn block_generate() {
     loop {
         if connection::is_all_connected() {
             unsafe {
-                if !PREVIOUS_GENERATOR.eq(&String::new()) {
-                    println(format!("[blockchain_manager]GENERATING BLOCK!"));
+                if !PREVIOUS_GENERATOR.eq(&-1) {
+                    let mut next_index = -1;
+                    if PREVIOUS_GENERATOR < (TRUSTED_KEY.len() - 1).try_into().unwrap() {
+                        next_index = PREVIOUS_GENERATOR + 1;
+                    } else {
+                        next_index = 0;
+                    }
+                    if TRUSTED_KEY
+                        .get(&next_index)
+                        .unwrap()
+                        .eq(&key_agent::SECRET[0].public_key(&SECP).to_string())
+                    {
+                        println(format!("[blockchain_manager]GENERATING BLOCK!"));
+                    }
                     thread::sleep(Duration::from_secs(1));
                 } else {
                     println(format!("[blockchain_manager]preloaded chain is not ready"));
@@ -34,7 +47,12 @@ pub fn block_generate() {
                     }
                     if latest_nodes == trusted_nodes {
                         println("[blockchain_manager]all node latest");
-                        PREVIOUS_GENERATOR = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"].to_string();
+                        let author = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"].to_string();
+                        for i in 0..TRUSTED_KEY.len() {
+                            if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&author) {
+                                PREVIOUS_GENERATOR = isize::try_from(i).unwrap();
+                            }
+                        }
                     } else {
                         println(format!(
                             "[blockchain_manager]there is not latest node:{}/{}",
@@ -49,31 +67,5 @@ pub fn block_generate() {
             ));
             thread::sleep(Duration::from_secs(8));
         }
-    }
-}
-pub fn get_next_generator(
-    trusted_list: HashMap<usize, String>,
-    previous_generator: String,
-) -> String {
-    for i in 0..trusted_list.len() {
-        if trusted_list.get(&i).unwrap().eq(&*previous_generator) {
-            return match i.eq(&(trusted_list.len() - 1)) {
-                true => trusted_list.get(&0).unwrap().clone(),
-                false => trusted_list.get(&(i + 1)).unwrap().clone(),
-            };
-        }
-    }
-    eprintln(format!("[blockchain_manager]trusted_key has no value"));
-    return String::new();
-}
-#[test]
-pub fn get_nextgenerator() {
-    key_agent::init();
-    sign_util::init();
-    unsafe {
-        get_next_generator(
-            sign_util::TRUSTED_KEY.clone(),
-            "026992eaf45a8a7b3e37ca6d586a3110d2af2c39c5547852d1028bd1144480b908".to_string(),
-        );
     }
 }

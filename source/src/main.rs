@@ -43,3 +43,11 @@ fn main() {
         }
     }
 }
+#[test]
+pub fn numeric_convert() {
+    let i: isize = 10;
+    let u: usize = i as usize;
+    assert!(u == 10);
+    let i = u as isize;
+    assert!(i == 10)
+}
