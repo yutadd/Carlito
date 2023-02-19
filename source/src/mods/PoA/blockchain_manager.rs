@@ -51,6 +51,7 @@ pub fn block_generate() {
                             .to_string(),
                         ));
                         println("[blockchain_manager]block generated successfully");
+                        BLOCKCHAIN.push(block.clone());
                         for c in CONNECTION_LIST.iter() {
                             c.write(format!(
                                 "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",

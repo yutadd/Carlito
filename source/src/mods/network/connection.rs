@@ -1,23 +1,27 @@
 use crate::mods::block::block::check;
 use crate::mods::block::block::BLOCKCHAIN;
+use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::config::config;
 use crate::mods::PoA::blockchain_manager::PREVIOUS_GENERATOR;
 
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
 use crate::mods::console::output::{eprintln, println};
+use async_std::sync;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
 use secp256k1::PublicKey;
 use std::io::{BufRead, Write};
+use std::net::Shutdown;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::{io::BufReader, net::TcpStream};
 static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
 pub static mut CONNECTION_LIST: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
+pub static mut is_blocked: bool = false;
 pub struct Connection {
     pub isok: bool, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,
@@ -46,7 +50,7 @@ impl Connection {
         loop {
             let mut line = String::new();
             let bytes = reader.read_line(&mut line).unwrap();
-            if bytes == 0 {
+            if bytes == 0 || !self.isok {
                 println(format!("[connection]接続終了"));
                 unsafe {
                     CONNECTION_LIST.remove(get_idx(self.id));
@@ -58,32 +62,48 @@ impl Connection {
                 if json_obj["type"].eq("hello") {
                     println(format!(
                         "[connection]received pubk is {}",
-                        json_obj["args"]["pubk"]
+                        json_obj["args"]["pubk"].to_string()
                     ));
+                    let mut is_already_connected = false;
                     unsafe {
-                        CONNECTION_LIST[get_idx(self.id)].pubk = Option::Some(
-                            PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
-                                .unwrap()
-                                .clone(),
-                        );
-                    }
-                    unsafe {
-                        if sign_util::is_host_trusted(
-                            CONNECTION_LIST[get_idx(self.id)].pubk.unwrap().to_string(),
-                        ) {
-                            let mut rng = rand::thread_rng();
-                            let generated_rand = rng.next_u32();
-                            self.write(format!(
-                                "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
-                                generated_rand
-                            ));
+                        for c in CONNECTION_LIST.iter() {
+                            if c.pubk.is_some() {
+                                if c.pubk
+                                    .unwrap()
+                                    .to_string()
+                                    .eq(&json_obj["args"]["pubk"].to_string())
+                                {
+                                    self.stream.shutdown(Shutdown::Both).unwrap();
+                                    CONNECTION_LIST[get_idx(self.id)].isok = false;
+                                    is_already_connected = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !is_already_connected {
+                            CONNECTION_LIST[get_idx(self.id)].pubk = Option::Some(
+                                PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
+                                    .unwrap()
+                                    .clone(),
+                            );
 
-                            CONNECTION_LIST[get_idx(self.id)].nonce =
-                                Option::Some(format!("{}", generated_rand));
-                        } else {
-                            println(format!(
-                                "[connection]connection dropped out for wrong pubk."
-                            ));
+                            if sign_util::is_host_trusted(
+                                CONNECTION_LIST[get_idx(self.id)].pubk.unwrap().to_string(),
+                            ) {
+                                let mut rng = rand::thread_rng();
+                                let generated_rand = rng.next_u32();
+                                self.write(format!(
+                                    "{{\"type\":\"req_sign\",\"args\":{{\"nonce\":\"{}\"}}}}\r\n",
+                                    generated_rand
+                                ));
+
+                                CONNECTION_LIST[get_idx(self.id)].nonce =
+                                    Option::Some(format!("{}", generated_rand));
+                            } else {
+                                println(format!(
+                                    "[connection]connection dropped out for wrong pubk."
+                                ));
+                            }
                         }
                     }
                 } else if json_obj["type"].eq("req_sign") {
@@ -136,30 +156,62 @@ impl Connection {
                     }
                 } else if json_obj["type"].eq("block") {
                     unsafe {
-                        if BLOCKCHAIN.len() > 0 {
-                            if json_obj["args"]["block"]["height"].as_usize().unwrap()
-                                > BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
-                                    .as_usize()
-                                    .unwrap()
-                            {
-                                if check(
-                                    json_obj["args"]["block"].clone(),
-                                    Message::from_hashed_data::<sha256::Hash>(
-                                        BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
-                                    )
-                                    .to_string(),
-                                ) {
-                                    println(format!(
+                        if !is_blocked {
+                            is_blocked = true;
+
+                            if BLOCKCHAIN.len() > 0 {
+                                println(format!(
+                                    "[connection]BLOCKCHAIN_LEN:{}",
+                                    BLOCKCHAIN.len() - 1
+                                ));
+                                println(format!(
+                                    "[connection]Block_full:{}",
+                                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
+                                ));
+                                if json_obj["args"]["block"]["height"].as_isize().unwrap()
+                                    > BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
+                                        .as_isize()
+                                        .unwrap()
+                                {
+                                    if check(
+                                        json_obj["args"]["block"].clone(),
+                                        Message::from_hashed_data::<sha256::Hash>(
+                                            BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                                        )
+                                        .to_string(),
+                                    ) {
+                                        println(format!(
                                 "[connection]Received block is correct and taller than my block"
                             ));
+                                        for i in 0..TRUSTED_KEY.len() {
+                                            if TRUSTED_KEY
+                                                .get(&(i as isize))
+                                                .unwrap()
+                                                .eq(&json_obj["author"])
+                                            {
+                                                PREVIOUS_GENERATOR = i as isize;
+                                                break;
+                                            }
+                                        }
+                                        BLOCKCHAIN.push(json_obj["args"]["block"].clone());
+                                        println("[connection]New block pushed to my blockchain");
+                                    } else if check(
+                                        json_obj["args"]["block"].clone(),
+                                        "*".to_string(),
+                                    ) {
+                                        println(format!(
+                                        "[connection]Received block is correct but it taller than my blockchain for 2 or more."
+                                    ));
+                                    } else {
+                                        eprintln(format!("[connection]Received block is taller than my block but not correct"));
+                                    }
                                 } else {
-                                    eprintln(format!("[connection]Received block is taller than my block but not correct"));
+                                    eprintln(format!(
+                                        "[connection]Received block is not taller than my block."
+                                    ));
                                 }
-                            } else {
-                                eprintln(format!(
-                                    "[connection]Received block is not taller than my block."
-                                ));
                             }
+                            is_blocked = false;
                         }
                     }
                     unsafe {
@@ -172,11 +224,12 @@ impl Connection {
         }
     }
     pub fn write(&self, context: String) {
-        (&*self.stream).write_all(context.as_bytes()).unwrap();
-        (&*self.stream).flush().unwrap();
+        if self.isok {
+            (&*self.stream).write_all(context.as_bytes()).unwrap();
+            (&*self.stream).flush().unwrap();
+        }
     }
 }
-
 pub fn is_all_connected() -> bool {
     unsafe {
         for tk in sign_util::TRUSTED_KEY.values() {
