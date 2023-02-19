@@ -8,6 +8,8 @@ use super::super::certification::sign_util;
 use crate::mods::console::output::{eprintln, println};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
+use secp256k1::hashes::sha256;
+use secp256k1::Message;
 use secp256k1::PublicKey;
 use std::io::{BufRead, Write};
 use std::str::FromStr;
@@ -140,7 +142,13 @@ impl Connection {
                                     .as_usize()
                                     .unwrap()
                             {
-                                if check(json_obj["args"]["block"].clone(), "*".to_string()) {
+                                if check(
+                                    json_obj["args"]["block"].clone(),
+                                    Message::from_hashed_data::<sha256::Hash>(
+                                        BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                                    )
+                                    .to_string(),
+                                ) {
                                     println(format!(
                                 "[connection]Received block is correct and taller than my block"
                             ));
