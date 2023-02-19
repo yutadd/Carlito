@@ -39,7 +39,9 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         height:block["height"].to_string().parse::<usize>().unwrap(),
         transactions:block["transactions"].clone(),
     ];
-    if previous_hash.eq(&block["previous_hash"].to_string()) {
+    if previous_hash.eq(&block["previous_hash"].to_string())
+        || block["previous_hash"].to_string().eq("*")
+    {
         println(format!("[block]verifying block:{}", block_without_sign));
         let mut any_invalid_ts = false;
         for t in block_without_sign["transactions"].members() {
