@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{prelude::*, BufReader};
 use std::str::FromStr;
-pub static mut TRUSTED_KEY: Lazy<HashMap<usize, String>> = Lazy::new(|| HashMap::new());
+pub static mut TRUSTED_KEY: Lazy<HashMap<isize, String>> = Lazy::new(|| HashMap::new());
 pub static SECP: Lazy<Secp256k1<All>> = Lazy::new(|| Secp256k1::new());
 pub fn init() {
     let file = OpenOptions::new()
@@ -25,6 +25,7 @@ pub fn init() {
             index += 1;
         }
     }
+    assert!(index > 0);
 }
 pub fn create_sign(original_message: String, secret_key: SecretKey) -> Signature {
     let message = Message::from_hashed_data::<sha256::Hash>(original_message.as_bytes());
@@ -50,10 +51,10 @@ pub fn is_host_trusted(key: String) -> bool {
             vector_str = format!(
                 "{}{}{}",
                 vector_str,
-                TRUSTED_KEY.get(&i).unwrap().as_str(),
+                TRUSTED_KEY.get(&(i as isize)).unwrap().as_str(),
                 "\n"
             );
-            if TRUSTED_KEY.get(&i).unwrap().eq(&key) {
+            if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&key) {
                 exists = true;
                 break;
             }
