@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
-use crate::mods::block::block::{check, BLOCKCHAIN};
+use crate::mods::block::block::{self, check, BLOCKCHAIN};
 use crate::mods::certification::key_agent::SECRET;
 use crate::mods::certification::sign_util::{create_sign, SECP, TRUSTED_KEY};
 use crate::mods::config::config::YAML;
@@ -20,7 +20,7 @@ pub static mut PREVIOUS_GENERATOR: isize = -1; //ブロック読み込みや受�
 pub fn block_generate() {
     unsafe {
         loop {
-            if connection::is_all_connected() || BLOCKCHAIN.len() > 0 {
+            if connection::is_all_connected() {
                 //ブロックの読み込みと準備が完了しているか
                 if !PREVIOUS_GENERATOR.eq(&-1) {
                     let mut next_index = -1;
@@ -38,37 +38,51 @@ pub fn block_generate() {
                         .unwrap()
                         .eq(&key_agent::SECRET[0].public_key(&SECP).to_string())
                     {
-                        //一つ前のブロックが生成された時間から+10000ミリ秒以上過ぎているか
-                        if NaiveDateTime::from_timestamp_millis(
-                            (BLOCKCHAIN[BLOCKCHAIN.len() - 1]["date"].as_isize().unwrap() + 10000)
-                                .try_into()
+                        //一つ前のブロックが生成された時間から+10000ミリ秒以上過ぎているかもしくはブロックがまだ生成されていないか
+                        if BLOCKCHAIN.len() == 0
+                            || NaiveDateTime::from_timestamp_millis(
+                                (BLOCKCHAIN[BLOCKCHAIN.len() - 1]["date"].as_isize().unwrap()
+                                    + 10000)
+                                    .try_into()
+                                    .unwrap(),
+                            )
+                            .unwrap()
+                            .cmp(
+                                &NaiveDateTime::from_timestamp_millis(
+                                    Utc::now().timestamp_millis(),
+                                )
                                 .unwrap(),
-                        )
-                        .unwrap()
-                        .cmp(
-                            &NaiveDateTime::from_timestamp_millis(Utc::now().timestamp_millis())
-                                .unwrap(),
-                        )
-                        .is_lt()
+                            )
+                            .is_lt()
                         {
-                            //ブロック生成
-                            let mut block = object![
-                                previous_hash:Message::from_hashed_data::<sha256::Hash>(BLOCKCHAIN[BLOCKCHAIN.len()-1].dump().as_bytes()).to_string(),
+                            let height;
+                            if BLOCKCHAIN.len() > 0 {
+                                height = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
+                                    .as_usize()
+                                    .unwrap();
+                            } else {
+                                height = 0;
+                            }
+                            let previous;
+                            if BLOCKCHAIN.len() > 0 {
+                                previous = Message::from_hashed_data::<sha256::Hash>(
+                                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                                )
+                                .to_string()
+                            } else {
+                                previous = block::GENESIS_BLOCK_HASH.to_string();
+                            }
+                            let mut block = object![//ブロック生成
+                                previous_hash:previous.clone(),
                                 author:SECRET[0].public_key(&SECP).to_string(),
                                 date:Utc::now().timestamp_millis(),
-                                height:BLOCKCHAIN[BLOCKCHAIN.len()-1]["height"].as_usize().unwrap()+1,
+                                height:height+1,
                                 transactions:array![],
                             ];
                             block
                                 .insert("sign", create_sign(block.dump(), SECRET[0]).to_string())
                                 .unwrap();
-                            assert!(check(
-                                block.clone(),
-                                Message::from_hashed_data::<sha256::Hash>(
-                                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
-                                )
-                                .to_string(),
-                            ));
+                            assert!(check(block.clone(), previous));
                             println("[blockchain_manager]block generated successfully");
                             BLOCKCHAIN.push(block.clone());
                             for c in CONNECTION_LIST.iter() {
@@ -81,9 +95,10 @@ pub fn block_generate() {
                     }
                     thread::sleep(Duration::from_secs(4));
                 } else {
-                    println(format!("[blockchain_manager]waiting for load local block"));
+                    println(format!("[blockchain_manager]registing loaded block"));
                     let mut latest_nodes = 0;
                     let mut trusted_nodes = 0;
+                    //ブロック受け取り済みのノードの数を調べつつ受けとていないノードにリクエストを送る
                     for c in CONNECTION_LIST.iter() {
                         if c.is_latest {
                             latest_nodes += 1;
@@ -94,8 +109,20 @@ pub fn block_generate() {
                             trusted_nodes += 1;
                         }
                     }
+                    //すべてからブロックを受け取り済みか
                     if latest_nodes == trusted_nodes {
-                        let author = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"].to_string();
+                        //一つ前のブロックの生成者をグローバル変数に登録
+
+                        let author;
+                        if BLOCKCHAIN.len() > 0 {
+                            author = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"].to_string();
+                        } else {
+                            author = TRUSTED_KEY
+                                .get(&((TRUSTED_KEY.len() - 1) as isize))
+                                .unwrap()
+                                .to_string();
+                            //一番最後のtrusted listの値を登録することで、次の生成者は最初の人になる。
+                        }
                         for i in 0..TRUSTED_KEY.len() {
                             if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&author) {
                                 PREVIOUS_GENERATOR = isize::try_from(i).unwrap();

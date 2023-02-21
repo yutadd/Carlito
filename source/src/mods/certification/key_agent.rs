@@ -62,34 +62,27 @@ fn append_key_to_file(key: SecretKey) {
     f.write(secret_str.as_bytes()).unwrap();
     f.flush().unwrap();
 }
-pub fn get_key(index: usize) -> Option<&'static SecretKey> {
-    unsafe { SECRET.get(index) }
-}
+
 pub fn get_key_length() -> usize {
     unsafe { SECRET.len() }
 }
 #[test]
 fn key_agent_init() {
-    init();
-    for i in 0..(get_key_length()) {
-        println(format!(
-            "[key_agent]init:{}",
-            get_key(i).unwrap().display_secret()
-        ));
-    }
-}
-#[test]
-fn make_key() {
     let secp = Secp256k1::new();
-    let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
-    println(format!(
-        "[key_agent]MAKE_KEY_SECRET:{}",
-        secret_key.display_secret()
-    ));
-    println(format!(
-        "[key_agent]MAKE_KEY_SECRET:{}",
-        secret_key.public_key(&secp).to_string()
-    ))
+    init();
+    unsafe {
+        for i in 0..(get_key_length()) {
+            println(format!(
+                "[key_agent]MAKE_KEY_SECRET:{}",
+                SECRET[0].display_secret()
+            ));
+        }
+
+        println(format!(
+            "[key_agent]MAKE_KEY_PUBLIC:{}",
+            SECRET[0].public_key(&secp).to_string()
+        ))
+    }
 }
 #[test]
 fn key_from_str() {

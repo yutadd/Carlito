@@ -1,10 +1,11 @@
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
+use crate::mods::block::block;
 use crate::mods::block::block::check;
 use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::config::config;
-use crate::mods::console::output::{eprintln, println};
+use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::PoA::blockchain_manager::PREVIOUS_GENERATOR;
 use async_std::sync;
 use once_cell::sync::Lazy;
@@ -24,7 +25,7 @@ static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
 pub static mut CONNECTION_LIST: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
 pub static mut is_blocked: bool = false;
 pub struct Connection {
-    pub isok: bool, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
+    pub is_connected: bool, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,
     pub stream: Arc<TcpStream>,
     pub is_trusted: bool,
@@ -35,7 +36,7 @@ pub struct Connection {
 impl Clone for Connection {
     fn clone(&self) -> Connection {
         Connection {
-            isok: self.isok.clone(),
+            is_connected: self.is_connected.clone(),
             id: self.id,
             stream: self.stream.clone(),
             is_trusted: self.is_trusted.clone(),
@@ -51,7 +52,7 @@ impl Connection {
         loop {
             let mut line = String::new();
             let bytes = reader.read_line(&mut line).unwrap();
-            if bytes == 0 || !self.isok {
+            if bytes == 0 || !self.is_connected {
                 println(format!("[connection]接続終了"));
                 unsafe {
                     CONNECTION_LIST.remove(get_idx(self.id));
@@ -75,7 +76,7 @@ impl Connection {
                                     .eq(&json_obj["args"]["pubk"].to_string())
                                 {
                                     self.stream.shutdown(Shutdown::Both).unwrap();
-                                    CONNECTION_LIST[get_idx(self.id)].isok = false;
+                                    CONNECTION_LIST[get_idx(self.id)].is_connected = false;
                                     is_already_connected = true;
                                     break;
                                 }
@@ -101,8 +102,8 @@ impl Connection {
                                 CONNECTION_LIST[get_idx(self.id)].nonce =
                                     Option::Some(format!("{}", generated_rand));
                             } else {
-                                println(format!(
-                                    "[connection]connection dropped out for wrong pubk."
+                                wprintln(format!(
+                                    "[connection]connection not trusted for wrong pubk."
                                 ));
                             }
                         }
@@ -144,7 +145,7 @@ impl Connection {
 
                     //すべてのノードに最新のブロックを問い合わせて、最新状態に同期する。
                     } else {
-                        println(format!("[connection]failed to verify this connection"));
+                        wprintln(format!("[connection]failed to verify this connection"));
                     }
                 } else if json_obj["type"].eq("get_latest") {
                     unsafe {
@@ -153,6 +154,8 @@ impl Connection {
                                 "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
                                 BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
                             ));
+                        } else {
+                            self.write(format!("{{\"type\":\"no_block\"}}",));
                         }
                     }
                 } else if json_obj["type"].eq("block") {
@@ -160,73 +163,66 @@ impl Connection {
                         if !is_blocked {
                             is_blocked = true;
 
-                            if BLOCKCHAIN.len() > 0 {
-                                println(format!(
-                                    "[connection]BLOCKCHAIN_LEN:{}",
-                                    BLOCKCHAIN.len() - 1
-                                ));
-                                println(format!(
-                                    "[connection]Block_full:{}",
-                                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
-                                ));
-                                if json_obj["args"]["block"]["height"].as_isize().unwrap()
-                                    > BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
-                                        .as_isize()
-                                        .unwrap()
-                                {
-                                    if check(
-                                        json_obj["args"]["block"].clone(),
-                                        Message::from_hashed_data::<sha256::Hash>(
-                                            BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
-                                        )
-                                        .to_string(),
-                                    ) {
-                                        println(format!(
+                            println(format!("[connection]BLOCKCHAIN_LEN:{}", BLOCKCHAIN.len()));
+                            if json_obj["args"]["block"]["height"].as_isize().unwrap()
+                                > (BLOCKCHAIN.len() + 1).try_into().unwrap()
+                            {
+                                let previous = match BLOCKCHAIN.len() > 0 {
+                                    true => Message::from_hashed_data::<sha256::Hash>(
+                                        BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                                    )
+                                    .to_string(),
+                                    false => block::GENESIS_BLOCK_HASH.to_string(),
+                                };
+                                if check(json_obj["args"]["block"].clone(), previous) {
+                                    println(format!(
                                 "[connection]Received block is correct and taller than my block"
                             ));
-                                        for i in 0..TRUSTED_KEY.len() {
-                                            if TRUSTED_KEY
-                                                .get(&(i as isize))
-                                                .unwrap()
-                                                .eq(&json_obj["author"])
-                                            {
-                                                PREVIOUS_GENERATOR = i as isize;
-                                                break;
-                                            }
+                                    for i in 0..TRUSTED_KEY.len() {
+                                        if TRUSTED_KEY
+                                            .get(&(i as isize))
+                                            .unwrap()
+                                            .eq(&json_obj["author"])
+                                        {
+                                            PREVIOUS_GENERATOR = i as isize;
+                                            break;
                                         }
-                                        BLOCKCHAIN.push(json_obj["args"]["block"].clone());
-                                        println("[connection]New block pushed to my blockchain");
-                                    } else if check(
-                                        json_obj["args"]["block"].clone(),
-                                        "*".to_string(),
-                                    ) {
-                                        println(format!(
+                                    }
+                                    BLOCKCHAIN.push(json_obj["args"]["block"].clone());
+                                    println("[connection]New block pushed to my blockchain");
+                                } else if check(json_obj["args"]["block"].clone(), "*".to_string())
+                                {
+                                    println(format!(
                                         "[connection]Received block is correct but it taller than my blockchain for 2 or more."
                                     ));
-                                    } else {
-                                        eprintln(format!("[connection]Received block is taller than my block but not correct"));
-                                    }
                                 } else {
-                                    eprintln(format!(
-                                        "[connection]Received block is not taller than my block."
-                                    ));
+                                    wprintln(format!("[connection]Received block is taller than my block but not correct"));
                                 }
+                            } else {
+                                wprintln(format!(
+                                    "[connection]Received block is not taller than my block."
+                                ));
                             }
+
                             is_blocked = false;
                         }
                     }
                     unsafe {
                         CONNECTION_LIST[get_idx(self.id)].is_latest = true;
                     }
+                } else if json_obj["type"].eq("no_block") {
+                    unsafe {
+                        CONNECTION_LIST[get_idx(self.id)].is_latest = true;
+                    }
                 } else {
-                    println(format!("[connection]connection received unknown command"));
+                    wprintln(format!("[connection]connection received unknown command"));
                 }
             }
         }
     }
     pub fn write(&self, context: String) {
         unsafe {
-            if self.isok {
+            if self.is_connected {
                 loop {
                     if !is_blocked {
                         break;
@@ -253,8 +249,8 @@ pub fn is_all_connected() -> bool {
                     }
                 }
                 if !aru {
-                    println(format!("[connection]there is not connected node"));
-                    println(format!("[connection]not connected node:{}", tk));
+                    wprintln(format!("[connection]there are some not connected node"));
+                    wprintln(format!("[connection]not connected node:{}", tk));
                     return false;
                 }
             }
@@ -297,7 +293,7 @@ pub fn init(stream: Arc<TcpStream>) -> Connection {
     }
     Connection {
         id: *COUNT.lock().unwrap(),
-        isok: true,
+        is_connected: true,
         stream: stream,
         is_trusted: false,
         pubk: Option::None,
