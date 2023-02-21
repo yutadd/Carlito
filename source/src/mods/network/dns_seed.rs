@@ -2,7 +2,7 @@
 use super::super::config::config;
 use super::connection;
 use super::connection::CONNECTION_LIST;
-use crate::mods::console::output::{eprintln, println};
+use crate::mods::console::output::{eprintln, println, wprintln};
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
 use std::net::TcpStream;
@@ -64,7 +64,7 @@ pub fn init() {
                         connection = stream;
                     }
                     Err(error) => {
-                        println(format!("[dns_seed]未接続:{}", error.kind()));
+                        wprintln(format!("[dns_seed]未接続:{}", error.kind()));
                         continue;
                     }
                 }
@@ -103,7 +103,7 @@ pub fn init() {
                     connection = stream;
                 }
                 Err(error) => {
-                    println(format!("[dns_seed]未接続:{}", error.kind()));
+                    wprintln(format!("[dns_seed]未接続:{}", error.kind()));
                     continue;
                 }
             }
