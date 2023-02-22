@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, sync::Mutex, thread, time::Duration};
 
 use crate::mods::block::block::{self, check, BLOCKCHAIN};
@@ -12,136 +13,134 @@ use crate::mods::{
 };
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use json::{array, object, JsonValue};
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
-pub static mut TRANSACTION_POOL: Lazy<Vec<JsonValue>> = Lazy::new(|| Vec::new());
-pub static mut PREVIOUS_GENERATOR: isize = -1; //ブロック読み込みや受け取り時に更新するべし
+#[derive(Clone)]
+struct BlockChainStats {
+    pub previous_generator: isize,
+    pub transaction_pool: Vec<JsonValue>,
+}
+static STATS: Lazy<Mutex<BlockChainStats>> = Lazy::new(|| {
+    Mutex::new(BlockChainStats {
+        previous_generator: -1,
+        transaction_pool: Vec::new(),
+    })
+});
+pub fn set_previous_generator(index: isize) {
+    println(format!(
+        "[blockchain_manager]before_change:{}",
+        STATS.lock().unwrap().previous_generator
+    ));
+    STATS.lock().unwrap().previous_generator = index;
+    println(format!(
+        "[blockchain_manager]after_change:{}",
+        STATS.lock().unwrap().previous_generator
+    ));
+}
+pub fn get_previous_generator() -> isize {
+    STATS.lock().unwrap().previous_generator
+}
 pub fn block_generate() {
     unsafe {
         loop {
-            if connection::is_all_connected() {
-                //ブロックの読み込みと準備が完了しているか
-                if !PREVIOUS_GENERATOR.eq(&-1) {
-                    let mut next_index = -1;
-
+            let mut next_index = -1;
+            //信用リスト内部における次の生成者の添字を算出する
+            if get_previous_generator() < ((TRUSTED_KEY.len() - 1) as isize) {
+                next_index = get_previous_generator() + 1;
+            } else {
+                next_index = 0;
+            }
+            for c in CONNECTION_LIST.iter() {
+                c.write(format!(
+                    "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
+                ));
+            }
+            //算出された次の生成車は自分か
+            if TRUSTED_KEY
+                .get(&next_index)
+                .unwrap()
+                .eq(&key_agent::SECRET[0].public_key(&SECP).to_string())
+            {
+                //一つ前のブロックが生成された時間から+10000ミリ秒以上過ぎているかもしくはブロックがまだ生成されていないか
+                if BLOCKCHAIN.len() == 0
+                    || NaiveDateTime::from_timestamp_millis(
+                        (BLOCKCHAIN[BLOCKCHAIN.len() - 1]["date"].as_isize().unwrap() + 10000)
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap()
+                    .cmp(
+                        &NaiveDateTime::from_timestamp_millis(Utc::now().timestamp_millis())
+                            .unwrap(),
+                    )
+                    .is_lt()
+                {
+                    let height;
+                    if BLOCKCHAIN.len() > 0 {
+                        height = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
+                            .as_usize()
+                            .unwrap();
+                    } else {
+                        height = 0;
+                    }
+                    let previous;
+                    if BLOCKCHAIN.len() > 0 {
+                        previous = Message::from_hashed_data::<sha256::Hash>(
+                            BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                        )
+                        .to_string()
+                    } else {
+                        previous = block::GENESIS_BLOCK_HASH.to_string();
+                    }
+                    let mut block = object![//ブロック生成
+                        previous_hash:previous.clone(),
+                        author:SECRET[0].public_key(&SECP).to_string(),
+                        date:Utc::now().timestamp_millis(),
+                        height:height+1,
+                        transactions:array![],
+                    ];
+                    block
+                        .insert("sign", create_sign(block.dump(), SECRET[0]).to_string())
+                        .unwrap();
+                    assert!(check(block.clone(), previous));
+                    println("[blockchain_manager]block generated successfully");
+                    BLOCKCHAIN.push(block.clone());
+                    for i in 0..TRUSTED_KEY.len() {
+                        if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&block["author"]) {
+                            set_previous_generator(i as isize);
+                            break;
+                        }
+                    }
                     //信用リスト内部における次の生成者の添字を算出する
-                    if PREVIOUS_GENERATOR < (TRUSTED_KEY.len() - 1).try_into().unwrap() {
-                        next_index = PREVIOUS_GENERATOR + 1;
+                    let _next_index = -1;
+                    if get_previous_generator() < ((TRUSTED_KEY.len() - 1) as isize) {
+                        next_index = get_previous_generator() + 1;
                     } else {
                         next_index = 0;
                     }
-
-                    //算出された次の生成車は自分か
-                    if TRUSTED_KEY
-                        .get(&next_index)
-                        .unwrap()
-                        .eq(&key_agent::SECRET[0].public_key(&SECP).to_string())
-                    {
-                        //一つ前のブロックが生成された時間から+10000ミリ秒以上過ぎているかもしくはブロックがまだ生成されていないか
-                        if BLOCKCHAIN.len() == 0
-                            || NaiveDateTime::from_timestamp_millis(
-                                (BLOCKCHAIN[BLOCKCHAIN.len() - 1]["date"].as_isize().unwrap()
-                                    + 10000)
-                                    .try_into()
-                                    .unwrap(),
-                            )
-                            .unwrap()
-                            .cmp(
-                                &NaiveDateTime::from_timestamp_millis(
-                                    Utc::now().timestamp_millis(),
-                                )
-                                .unwrap(),
-                            )
-                            .is_lt()
-                        {
-                            let height;
-                            if BLOCKCHAIN.len() > 0 {
-                                height = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
-                                    .as_usize()
-                                    .unwrap();
-                            } else {
-                                height = 0;
-                            }
-                            let previous;
-                            if BLOCKCHAIN.len() > 0 {
-                                previous = Message::from_hashed_data::<sha256::Hash>(
-                                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
-                                )
-                                .to_string()
-                            } else {
-                                previous = block::GENESIS_BLOCK_HASH.to_string();
-                            }
-                            let mut block = object![//ブロック生成
-                                previous_hash:previous.clone(),
-                                author:SECRET[0].public_key(&SECP).to_string(),
-                                date:Utc::now().timestamp_millis(),
-                                height:height+1,
-                                transactions:array![],
-                            ];
-                            block
-                                .insert("sign", create_sign(block.dump(), SECRET[0]).to_string())
-                                .unwrap();
-                            assert!(check(block.clone(), previous));
-                            println("[blockchain_manager]block generated successfully");
-                            BLOCKCHAIN.push(block.clone());
-                            for c in CONNECTION_LIST.iter() {
-                                c.write(format!(
-                                    "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
-                                    block.dump()
-                                ));
-                            }
-                        }
-                    }
-                    thread::sleep(Duration::from_secs(4));
-                } else {
-                    println(format!("[blockchain_manager]registing loaded block"));
-                    let mut latest_nodes = 0;
-                    let mut trusted_nodes = 0;
-                    //ブロック受け取り済みのノードの数を調べつつ受けとていないノードにリクエストを送る
+                    println(format!("[blockchain_manager]next generator:{}", next_index));
                     for c in CONNECTION_LIST.iter() {
-                        if c.is_latest {
-                            latest_nodes += 1;
-                        } else {
-                            c.write("{\"type\":\"get_latest\"}\r\n".to_string());
-                        }
-                        if c.is_trusted {
-                            trusted_nodes += 1;
-                        }
-                    }
-                    //すべてからブロックを受け取り済みか
-                    if latest_nodes == trusted_nodes {
-                        //一つ前のブロックの生成者をグローバル変数に登録
-
-                        let author;
-                        if BLOCKCHAIN.len() > 0 {
-                            author = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"].to_string();
-                        } else {
-                            author = TRUSTED_KEY
-                                .get(&((TRUSTED_KEY.len() - 1) as isize))
-                                .unwrap()
-                                .to_string();
-                            //一番最後のtrusted listの値を登録することで、次の生成者は最初の人になる。
-                        }
-                        for i in 0..TRUSTED_KEY.len() {
-                            if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&author) {
-                                PREVIOUS_GENERATOR = isize::try_from(i).unwrap();
-                            }
-                        }
-                    } else {
-                        println(format!(
-                            "[blockchain_manager]there is not latest node:{}/{}",
-                            latest_nodes, trusted_nodes
+                        c.write(format!(
+                            "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                            block.dump()
                         ));
                     }
-                    thread::sleep(Duration::from_secs(4));
+                } else {
+                    println("[blockchain_manager]time not elapsed");
                 }
             } else {
-                println(format!(
-                    "[blockchain_manager]waiting connection and prepare blockchain"
-                ));
-                thread::sleep(Duration::from_secs(4));
+                println("[blockchain_manager]generator is not me this time");
+                let _next_index = -1;
+                if get_previous_generator() < ((TRUSTED_KEY.len() - 1) as isize) {
+                    next_index = get_previous_generator() + 1;
+                } else {
+                    next_index = 0;
+                }
+                println(format!("[blockchain_manager]next generator:{}", next_index));
             }
+            thread::sleep(Duration::from_secs(4));
         }
     }
 }

@@ -3,6 +3,7 @@ use mods::block::block;
 use mods::block::block::read_block_from_local;
 use mods::certification::key_agent;
 use mods::certification::sign_util;
+use mods::network::connection;
 use mods::network::connection_listener;
 use mods::network::dns_seed;
 use std::io::stdin;
@@ -24,13 +25,13 @@ fn main() {
     println(format!("[main]Initializing..."));
     key_agent::init();
     sign_util::init();
+    block::read_block_from_local();
+    thread::spawn(|| blockchain_manager::block_generate());
     thread::spawn(|| {
         connection_listener::run();
-        println(format!("[main]thread-Inited"));
     });
+    println(format!("[main]thread-Inited"));
     dns_seed::init();
-    thread::spawn(|| block::read_block_from_local());
-    thread::spawn(|| blockchain_manager::block_generate());
     println(format!("[main]Inited"));
     loop {
         let line = &mut String::new();
