@@ -52,10 +52,12 @@ pub fn block_generate() {
                 next_index = 0;
             }
             for c in CONNECTION_LIST.iter() {
-                c.write(format!(
-                    "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
-                    BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
-                ));
+                if BLOCKCHAIN.len() > 0 {
+                    c.write(format!(
+                        "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                        BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
+                    ));
+                }
             }
             //算出された次の生成車は自分か
             if TRUSTED_KEY

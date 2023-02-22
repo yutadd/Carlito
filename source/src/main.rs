@@ -6,8 +6,11 @@ use mods::certification::sign_util;
 use mods::network::connection;
 use mods::network::connection_listener;
 use mods::network::dns_seed;
+use once_cell::sync::Lazy;
 use std::io::stdin;
+use std::sync::Mutex;
 use std::thread;
+use std::time::Duration;
 
 use crate::mods::PoA::blockchain_manager;
 mod mods;
@@ -41,6 +44,21 @@ fn main() {
         }
     }
 }
+struct TEST {
+    pub num: isize,
+}
+impl Clone for TEST {
+    fn clone(&self) -> TEST {
+        TEST { num: self.num }
+    }
+}
+impl TEST {
+    pub fn test_th(&self) {
+        println!("num:{}", TESTARRAY.lock().unwrap()[0].num);
+        TESTARRAY.lock().unwrap()[0].num = 50;
+    }
+}
+static TESTARRAY: Lazy<Mutex<Vec<TEST>>> = Lazy::new(|| Mutex::new(Vec::new()));
 #[test]
 pub fn numeric_convert() {
     let i: isize = 10;
@@ -48,4 +66,13 @@ pub fn numeric_convert() {
     assert!(u == 10);
     let i = u as isize;
     assert!(i == 10)
+}
+#[test]
+pub fn access_test() {
+    let test = TEST { num: -1 };
+    TESTARRAY.lock().unwrap().push(test.clone());
+    thread::spawn(move || test.test_th());
+    thread::sleep(Duration::from_secs(1));
+    println!("finish:{}", TESTARRAY.lock().unwrap()[0].num);
+    println!("finish:{}", TESTARRAY.lock().unwrap()[0].num);
 }
