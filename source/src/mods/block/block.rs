@@ -1,5 +1,6 @@
 use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::network::connection;
+use crate::mods::PoA::blockchain_manager::set_previous_generator;
 use chrono::{DateTime, Utc};
 use json::{array, object, JsonValue};
 use once_cell::sync::Lazy;
@@ -15,7 +16,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::mods::certification::sign_util::create_sign;
+use crate::mods::certification::sign_util::{create_sign, TRUSTED_KEY};
 use crate::mods::{
     certification::{key_agent, sign_util},
     transaction::transaction,
@@ -135,6 +136,22 @@ pub fn read_block_from_local() {
                 }
             }
         }
+    }
+    if last_block_height > 0 {
+        unsafe {
+            for i in 0..TRUSTED_KEY.len() {
+                if TRUSTED_KEY
+                    .get(&(i as isize))
+                    .unwrap()
+                    .eq(&BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"])
+                {
+                    set_previous_generator(i as isize);
+                    break;
+                }
+            }
+        }
+    } else {
+        set_previous_generator(-1);
     }
     assert_eq!(get_index_and_line(last_block_height).0, i);
 }

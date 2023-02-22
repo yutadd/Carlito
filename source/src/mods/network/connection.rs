@@ -6,7 +6,8 @@ use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::config::config;
 use crate::mods::console::output::{eprintln, println, wprintln};
-use crate::mods::PoA::blockchain_manager::PREVIOUS_GENERATOR;
+use crate::mods::PoA::blockchain_manager::get_previous_generator;
+use crate::mods::PoA::blockchain_manager::set_previous_generator;
 use async_std::sync;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -23,7 +24,8 @@ use std::time::Duration;
 use std::{io::BufReader, net::TcpStream};
 static COUNT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(0));
 pub static mut CONNECTION_LIST: Lazy<Vec<Connection>> = Lazy::new(|| Vec::new());
-pub static mut is_blocked: bool = false;
+pub static IS_BLOCKED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+
 pub struct Connection {
     pub is_connected: bool, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,
@@ -155,17 +157,21 @@ impl Connection {
                                 BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
                             ));
                         } else {
-                            self.write(format!("{{\"type\":\"no_block\"}}",));
+                            self.write("{\"type\":\"no_block\"}\r\n".to_string());
                         }
                     }
                 } else if json_obj["type"].eq("block") {
                     unsafe {
-                        if !is_blocked {
-                            is_blocked = true;
+                        if !*IS_BLOCKED.lock().unwrap() {
+                            *IS_BLOCKED.lock().unwrap() = true;
 
                             println(format!("[connection]BLOCKCHAIN_LEN:{}", BLOCKCHAIN.len()));
-                            if json_obj["args"]["block"]["height"].as_isize().unwrap()
-                                > (BLOCKCHAIN.len() + 1).try_into().unwrap()
+                            println(format!(
+                                "[connection]received height:{}",
+                                json_obj["args"]["block"]["height"].as_usize().unwrap()
+                            ));
+                            if json_obj["args"]["block"]["height"].as_usize().unwrap()
+                                > BLOCKCHAIN.len()
                             {
                                 let previous = match BLOCKCHAIN.len() > 0 {
                                     true => Message::from_hashed_data::<sha256::Hash>(
@@ -179,15 +185,24 @@ impl Connection {
                                 "[connection]Received block is correct and taller than my block"
                             ));
                                     for i in 0..TRUSTED_KEY.len() {
+                                        println(format!(
+                                            "[connection]compare trusted_key:{} and {}",
+                                            TRUSTED_KEY.get(&(i as isize)).unwrap(),
+                                            &json_obj["args"]["block"]["author"].to_string()
+                                        ));
                                         if TRUSTED_KEY
                                             .get(&(i as isize))
                                             .unwrap()
-                                            .eq(&json_obj["author"])
+                                            .eq(&json_obj["args"]["block"]["author"].to_string())
                                         {
-                                            PREVIOUS_GENERATOR = i as isize;
+                                            set_previous_generator(i as isize);
                                             break;
                                         }
                                     }
+                                    println(format!(
+                                        "[connection]previous_generator:{}",
+                                        get_previous_generator()
+                                    ));
                                     BLOCKCHAIN.push(json_obj["args"]["block"].clone());
                                     println("[connection]New block pushed to my blockchain");
                                 } else if check(json_obj["args"]["block"].clone(), "*".to_string())
@@ -203,8 +218,9 @@ impl Connection {
                                     "[connection]Received block is not taller than my block."
                                 ));
                             }
-
-                            is_blocked = false;
+                            *IS_BLOCKED.lock().unwrap() = false;
+                        } else {
+                            println("[connection]_blocked thread.")
                         }
                     }
                     unsafe {
@@ -221,21 +237,20 @@ impl Connection {
         }
     }
     pub fn write(&self, context: String) {
-        unsafe {
-            if self.is_connected {
-                loop {
-                    if !is_blocked {
-                        break;
-                    }
-                    thread::sleep(Duration::from_secs(1));
+        if self.is_connected {
+            loop {
+                if !*IS_BLOCKED.lock().unwrap() {
+                    break;
                 }
-                (&*self.stream).write_all(context.as_bytes()).unwrap();
-                (&*self.stream).flush().unwrap();
+                println("[connection]blocking thread");
+                thread::sleep(Duration::from_secs(1));
             }
+            (&*self.stream).write_all(context.as_bytes()).unwrap();
+            (&*self.stream).flush().unwrap();
         }
     }
 }
-pub fn is_all_connected() -> bool {
+/*pub fn is_all_connected() -> bool {
     unsafe {
         for tk in sign_util::TRUSTED_KEY.values() {
             if !tk.eq(config::YAML["docker"]["own-pubk"].as_str().unwrap()) {
@@ -257,7 +272,7 @@ pub fn is_all_connected() -> bool {
         }
         return true;
     }
-}
+}*/
 fn get_idx(id: u16) -> usize {
     unsafe {
         for idx in 0..CONNECTION_LIST.len() {
