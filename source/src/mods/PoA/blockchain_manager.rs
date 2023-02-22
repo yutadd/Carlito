@@ -52,11 +52,13 @@ pub fn block_generate() {
                 next_index = 0;
             }
             for c in CONNECTION_LIST.iter() {
-                if BLOCKCHAIN.len() > 0 {
+                if BLOCKCHAIN.read().unwrap().len() > 0 {
                     c.write(format!(
                         "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
-                        BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
+                        BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1].dump()
                     ));
+                } else {
+                    println("[blockchain_manager]block not generated yet")
                 }
             }
             //算出された次の生成車は自分か
@@ -66,9 +68,12 @@ pub fn block_generate() {
                 .eq(&key_agent::SECRET[0].public_key(&SECP).to_string())
             {
                 //一つ前のブロックが生成された時間から+10000ミリ秒以上過ぎているかもしくはブロックがまだ生成されていないか
-                if BLOCKCHAIN.len() == 0
+                if BLOCKCHAIN.read().unwrap().len() == 0
                     || NaiveDateTime::from_timestamp_millis(
-                        (BLOCKCHAIN[BLOCKCHAIN.len() - 1]["date"].as_isize().unwrap() + 10000)
+                        (BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["date"]
+                            .as_isize()
+                            .unwrap()
+                            + 10000)
                             .try_into()
                             .unwrap(),
                     )
@@ -80,17 +85,20 @@ pub fn block_generate() {
                     .is_lt()
                 {
                     let height;
-                    if BLOCKCHAIN.len() > 0 {
-                        height = BLOCKCHAIN[BLOCKCHAIN.len() - 1]["height"]
+                    if BLOCKCHAIN.read().unwrap().len() > 0 {
+                        height = BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]
+                            ["height"]
                             .as_usize()
                             .unwrap();
                     } else {
                         height = 0;
                     }
                     let previous;
-                    if BLOCKCHAIN.len() > 0 {
+                    if BLOCKCHAIN.read().unwrap().len() > 0 {
                         previous = Message::from_hashed_data::<sha256::Hash>(
-                            BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                            BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]
+                                .dump()
+                                .as_bytes(),
                         )
                         .to_string()
                     } else {
@@ -108,7 +116,7 @@ pub fn block_generate() {
                         .unwrap();
                     assert!(check(block.clone(), previous));
                     println("[blockchain_manager]block generated successfully");
-                    BLOCKCHAIN.push(block.clone());
+                    BLOCKCHAIN.write().unwrap().push(block.clone());
                     for i in 0..TRUSTED_KEY.len() {
                         if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&block["author"]) {
                             set_previous_generator(i as isize);

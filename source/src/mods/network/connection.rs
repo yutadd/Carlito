@@ -151,10 +151,11 @@ impl Connection {
                     }
                 } else if json_obj["type"].eq("get_latest") {
                     unsafe {
-                        if BLOCKCHAIN.len() > 0 {
+                        if BLOCKCHAIN.read().unwrap().len() > 0 {
                             self.write(format!(
                                 "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
-                                BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump()
+                                BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]
+                                    .dump()
                             ));
                         } else {
                             self.write("{\"type\":\"no_block\"}\r\n".to_string());
@@ -165,17 +166,23 @@ impl Connection {
                         if !*IS_BLOCKED.lock().unwrap() {
                             *IS_BLOCKED.lock().unwrap() = true;
 
-                            println(format!("[connection]BLOCKCHAIN_LEN:{}", BLOCKCHAIN.len()));
+                            println(format!(
+                                "[connection]BLOCKCHAIN_LEN:{}",
+                                BLOCKCHAIN.read().unwrap().len()
+                            ));
                             println(format!(
                                 "[connection]received height:{}",
                                 json_obj["args"]["block"]["height"].as_usize().unwrap()
                             ));
                             if json_obj["args"]["block"]["height"].as_usize().unwrap()
-                                > BLOCKCHAIN.len()
+                                > BLOCKCHAIN.read().unwrap().len()
                             {
-                                let previous = match BLOCKCHAIN.len() > 0 {
+                                let previous = match BLOCKCHAIN.read().unwrap().len() > 0 {
                                     true => Message::from_hashed_data::<sha256::Hash>(
-                                        BLOCKCHAIN[BLOCKCHAIN.len() - 1].dump().as_bytes(),
+                                        BLOCKCHAIN.read().unwrap()
+                                            [BLOCKCHAIN.read().unwrap().len() - 1]
+                                            .dump()
+                                            .as_bytes(),
                                     )
                                     .to_string(),
                                     false => block::GENESIS_BLOCK_HASH.to_string(),
@@ -203,7 +210,10 @@ impl Connection {
                                         "[connection]previous_generator:{}",
                                         get_previous_generator()
                                     ));
-                                    BLOCKCHAIN.push(json_obj["args"]["block"].clone());
+                                    BLOCKCHAIN
+                                        .write()
+                                        .unwrap()
+                                        .push(json_obj["args"]["block"].clone());
                                     println("[connection]New block pushed to my blockchain");
                                 } else if check(json_obj["args"]["block"].clone(), "*".to_string())
                                 {

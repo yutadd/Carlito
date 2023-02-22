@@ -75,4 +75,5 @@ pub fn access_test() {
     thread::sleep(Duration::from_secs(1));
     println!("finish:{}", TESTARRAY.lock().unwrap()[0].num);
     println!("finish:{}", TESTARRAY.lock().unwrap()[0].num);
+    println!("leng:{}", TESTARRAY.lock().unwrap().len());
 }
