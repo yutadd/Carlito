@@ -1,6 +1,5 @@
 use super::super::config::config::YAML;
 use super::connection;
-use super::connection::CONNECTION_LIST;
 use crate::mods::console::output::{eprintln, println};
 use std::net::TcpListener;
 use std::sync::Arc;
@@ -20,11 +19,13 @@ pub fn run() {
     for streams in listener.incoming() {
         println(format!("[connection_listener]connection incoming!"));
         let streams = streams.unwrap();
-        unsafe {
-            let user = connection::init(Arc::new(streams));
-            let user2 = user.clone();
-            CONNECTION_LIST.push(user);
-            thread::spawn(move || user2.read_thread());
-        }
+        let user = connection::init(Arc::new(streams));
+        let mut user2 = user.clone();
+        connection::STATS
+            .write()
+            .unwrap()
+            .connection_list
+            .push(user);
+        thread::spawn(move || user2.read_thread());
     }
 }

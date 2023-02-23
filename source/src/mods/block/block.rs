@@ -10,6 +10,7 @@ use secp256k1::{Message, SecretKey};
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::ops::IndexMut;
+use std::sync::{Mutex, RwLock};
 use std::{
     fs::OpenOptions,
     io::{BufRead, BufReader},
@@ -29,7 +30,7 @@ use crate::mods::{
 pub static GENESIS_BLOCK_HASH: &str =
     "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D";
 pub static TX_PER_FILE: usize = 100;
-pub static mut BLOCKCHAIN: Lazy<Vec<JsonValue>> = Lazy::new(|| Vec::new());
+pub static BLOCKCHAIN: Lazy<RwLock<Vec<JsonValue>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
 pub fn check(block: JsonValue, previous_hash: String) -> bool {
     println(format!("[block]dumped_full_block:{}", block.dump()));
@@ -132,7 +133,7 @@ pub fn read_block_from_local() {
                 last_block_height = _block["height"].as_usize().unwrap();
                 println(format!("[block]height:{}", last_block_height));
                 unsafe {
-                    BLOCKCHAIN.push(_block);
+                    BLOCKCHAIN.write().unwrap().push(_block);
                 }
             }
         }
@@ -143,7 +144,7 @@ pub fn read_block_from_local() {
                 if TRUSTED_KEY
                     .get(&(i as isize))
                     .unwrap()
-                    .eq(&BLOCKCHAIN[BLOCKCHAIN.len() - 1]["author"])
+                    .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])
                 {
                     set_previous_generator(i as isize);
                     break;
