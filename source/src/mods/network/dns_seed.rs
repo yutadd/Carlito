@@ -1,6 +1,6 @@
 use super::super::config::config;
 use super::connection;
-use crate::mods::console::output::{println, wprintln};
+use crate::mods::console::output::{eprintln, println, wprintln};
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
 use std::net::TcpStream;
@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use trust_dns_client::client::{Client, SyncClient};
-use trust_dns_client::op::DnsResponse;
 use trust_dns_client::rr::{DNSClass, Name, RData, RecordType};
 use trust_dns_client::udp::UdpClientConnection;
 
@@ -35,15 +34,24 @@ pub static CLIENT: Lazy<SyncClient<UdpClientConnection>> = Lazy::new(|| {
 fn get_addr(name: String) -> Vec<Ipv4Addr> {
     println(format!("[dns_seed]request resolv: {}", name));
     let name = Name::from_str(name.as_str()).unwrap();
-    let response: DnsResponse = CLIENT.query(&name, DNSClass::IN, RecordType::A).unwrap();
-    let mut v = Vec::new();
-    for answor in response.answers() {
-        if let Some(RData::A(addr)) = answor.data() {
-            v.push(*addr);
-            println(format!("[dns_seed]fetched seeds addr: {}", *addr));
-        }
+    loop {
+        match CLIENT.query(&name, DNSClass::IN, RecordType::A) {
+            Ok(o) => {
+                let mut v = Vec::new();
+                for answor in o.answers() {
+                    if let Some(RData::A(addr)) = answor.data() {
+                        v.push(*addr);
+                        println(format!("[dns_seed]fetched seeds addr: {}", *addr));
+                    }
+                }
+                return v;
+            }
+            Err(e) => {
+                eprintln(format!("[dns_seed]error on quering DNS:{}", e.kind()));
+                return Vec::new();
+            }
+        };
     }
-    v
 }
 pub fn init() {
     let is_docker;
