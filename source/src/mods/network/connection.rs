@@ -64,7 +64,16 @@ impl Connection {
         let mut reader = BufReader::new(&*binding);
         loop {
             let mut line = String::new();
-            let bytes = reader.read_line(&mut line).unwrap();
+            let bytes = match reader.read_line(&mut line) {
+                Ok(o) => o,
+                Err(e) => {
+                    println(format!(
+                        "[connection]error on reading input buffer:{}",
+                        e.kind()
+                    ));
+                    break;
+                }
+            };
             if bytes == 0 || line.trim().len() == 0 {
                 self.is_connected = false;
                 self.stream.shutdown(Shutdown::Both).unwrap();
@@ -279,10 +288,13 @@ pub fn ovserve() {
         }
         let after_len = _stats.connection_list.len();
         drop(_stats);
-        println(format!(
-            "[connection]connection_list's gabage collacted:{}->{}",
-            len, after_len
-        ));
+        if len - after_len > 0 {
+            println(format!(
+                "[connection]connection_list's gabage collacted:{}->{}",
+                len, after_len
+            ));
+        }
+
         thread::sleep(Duration::from_secs(12));
     }
 }
