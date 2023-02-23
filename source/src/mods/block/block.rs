@@ -1,27 +1,21 @@
 use crate::mods::console::output::{eprintln, println, wprintln};
-use crate::mods::network::connection;
-use crate::mods::PoA::blockchain_manager::set_previous_generator;
-use chrono::{DateTime, Utc};
-use json::{array, object, JsonValue};
+use crate::mods::poa::blockchain_manager::set_previous_generator;
+use json::{object, JsonValue};
 use once_cell::sync::Lazy;
 use secp256k1::hashes::sha256;
-use secp256k1::{ecdsa::Signature, PublicKey};
-use secp256k1::{Message, SecretKey};
+use secp256k1::Message;
+use secp256k1::PublicKey;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use std::ops::IndexMut;
-use std::sync::{Mutex, RwLock};
+use std::sync::RwLock;
 use std::{
     fs::OpenOptions,
     io::{BufRead, BufReader},
     str::FromStr,
 };
 
-use crate::mods::certification::sign_util::{create_sign, TRUSTED_KEY};
-use crate::mods::{
-    certification::{key_agent, sign_util},
-    transaction::transaction,
-};
+use crate::mods::certification::sign_util::TRUSTED_KEY;
+use crate::mods::{certification::sign_util, transaction::transaction};
 
 /**
  * /Blocks/に最低１ブロックはなければならない。
@@ -73,7 +67,7 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         false
     }
 }
-
+#[warn(dead_code)]
 pub fn append_block(text: String) {
     let height_str = text.split("-").collect::<Vec<&str>>();
     let height = height_str[3].parse::<usize>().unwrap();
@@ -132,9 +126,7 @@ pub fn read_block_from_local() {
                 previous = hash.to_string();
                 last_block_height = _block["height"].as_usize().unwrap();
                 println(format!("[block]height:{}", last_block_height));
-                unsafe {
-                    BLOCKCHAIN.write().unwrap().push(_block);
-                }
+                BLOCKCHAIN.write().unwrap().push(_block);
             }
         }
     }
@@ -166,6 +158,13 @@ pub fn get_index_and_line(height: usize) -> (usize, usize) {
 
 #[test]
 pub fn create_block() {
+    use crate::mods::console::output::println;
+    use json::{array, object};
+    use secp256k1::SecretKey;
+    use std::str::FromStr;
+
+    use crate::mods::certification::sign_util::create_sign;
+
     let example_transaction = object![
         author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
         date:1676449733,

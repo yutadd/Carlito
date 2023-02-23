@@ -1,19 +1,21 @@
 extern crate yaml_rust;
-use crate::mods::console::output::{eprintln, println};
-use once_cell::sync::Lazy;
+use crate::mods::console::output::println;
+use once_cell::sync::OnceCell;
 use std::fs;
 use yaml_rust::{Yaml, YamlLoader};
 
-pub static mut YAML: Lazy<Yaml> = Lazy::new(|| {
-    YamlLoader::load_from_str(&fs::read_to_string("Config/config.yml").unwrap()).unwrap()[0].clone()
-});
-
+pub static YAML: OnceCell<Yaml> = OnceCell::new();
+pub fn init() {
+    YAML.set(
+        YamlLoader::load_from_str(&fs::read_to_string("Config/config.yml").unwrap()).unwrap()[0]
+            .clone(),
+    )
+    .unwrap();
+}
 #[test]
 fn config_init() {
-    unsafe {
-        println(format!(
-            "[config]unsafe config getter:{}",
-            YAML["network"]["domain"].as_str().unwrap()
-        ));
-    }
+    println(format!(
+        "[config]unsafe config getter:{}",
+        YAML.get().unwrap()["network"]["domain"].as_str().unwrap()
+    ));
 }

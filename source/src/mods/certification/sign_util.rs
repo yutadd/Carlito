@@ -76,27 +76,25 @@ fn sign_util_init() {
 #[test]
 fn sign_util_verify() {
     use crate::mods::certification::key_agent;
+    use crate::mods::certification::key_agent::SECRET;
     key_agent::init();
-    unsafe {
-        let sign = create_sign("HelloWorld".to_string(), key_agent::SECRET[0]);
-        println(format!("[sign_util]show sign:{}", sign));
-        println(format!(
-            "[sign_util]verify sign:{}",
-            verify_sign(
-                "HelloWorld".to_string(),
-                sign.to_string(),
-                key_agent::SECRET[0].public_key(&SECP)
-            )
-        ));
-        println(format!(
-            "[sign_util]verify wrong message:{}",
-            verify_sign(
-                "HelloWorld01".to_string(),
-                sign.to_string(),
-                key_agent::SECRET[0].public_key(&SECP)
-            )
-        ));
-    }
-
+    let sign = create_sign("HelloWorld".to_string(), *SECRET.get().unwrap());
+    println(format!("[sign_util]show sign:{}", sign));
+    println(format!(
+        "[sign_util]verify sign:{}",
+        verify_sign(
+            "HelloWorld".to_string(),
+            sign.to_string(),
+            SECRET.get().unwrap().public_key(&SECP)
+        )
+    ));
+    println(format!(
+        "[sign_util]verify wrong message:{}",
+        verify_sign(
+            "HelloWorld01".to_string(),
+            sign.to_string(),
+            SECRET.get().unwrap().public_key(&SECP)
+        )
+    ));
     println(format!("[sign_util]end_test_signeture"));
 }

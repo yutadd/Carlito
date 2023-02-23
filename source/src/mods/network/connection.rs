@@ -4,11 +4,9 @@ use crate::mods::block::block;
 use crate::mods::block::block::check;
 use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
-use crate::mods::config::config;
-use crate::mods::console::output::{eprintln, println, wprintln};
-use crate::mods::PoA::blockchain_manager::get_previous_generator;
-use crate::mods::PoA::blockchain_manager::set_previous_generator;
-use async_std::sync;
+use crate::mods::console::output::{println, wprintln};
+use crate::mods::poa::blockchain_manager::get_previous_generator;
+use crate::mods::poa::blockchain_manager::set_previous_generator;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use secp256k1::hashes::sha256;
@@ -66,7 +64,16 @@ impl Connection {
         let mut reader = BufReader::new(&*binding);
         loop {
             let mut line = String::new();
-            let bytes = reader.read_line(&mut line).unwrap();
+            let bytes = match reader.read_line(&mut line) {
+                Ok(o) => o,
+                Err(e) => {
+                    println(format!(
+                        "[connection]error on reading input buffer:{}",
+                        e.kind()
+                    ));
+                    break;
+                }
+            };
             if bytes == 0 || line.trim().len() == 0 {
                 self.is_connected = false;
                 self.stream.shutdown(Shutdown::Both).unwrap();
@@ -100,17 +107,15 @@ impl Connection {
                     ));
                 }
             } else if json_obj["type"].eq("req_sign") {
-                unsafe {
-                    let sign = sign_util::create_sign(
-                        json_obj["args"]["nonce"].as_str().unwrap().to_string(),
-                        key_agent::SECRET[0],
-                    );
-                    self.write(format!(
-                        "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
-                        sign.to_string()
-                    ));
-                    println(format!("[connection]sign was sent"));
-                }
+                let sign = sign_util::create_sign(
+                    json_obj["args"]["nonce"].as_str().unwrap().to_string(),
+                    *key_agent::SECRET.get().unwrap(),
+                );
+                self.write(format!(
+                    "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
+                    sign.to_string()
+                ));
+                println(format!("[connection]sign was sent"));
             } else if json_obj["type"].eq("signed") {
                 let verify_result;
                 verify_result = sign_util::verify_sign(
@@ -224,15 +229,23 @@ impl Connection {
         if self.is_connected {
             match (&*self.stream).write_all(context.as_bytes()) {
                 Err(e) => {
+                    println(format!(
+                        "[connection]connection aborted due to :{}",
+                        e.kind()
+                    ));
                     self.is_connected = false;
                 }
-                Ok(o) => {}
+                Ok(o) => o,
             };
             match (&*self.stream).flush() {
                 Err(e) => {
+                    println(format!(
+                        "[connection]connection aborted due to :{}",
+                        e.kind()
+                    ));
                     self.is_connected = false;
                 }
-                Ok(o) => {}
+                Ok(o) => o,
             };
         }
     }
@@ -275,45 +288,41 @@ pub fn ovserve() {
         }
         let after_len = _stats.connection_list.len();
         drop(_stats);
-        println(format!(
-            "[connection]connection_list's gabage collacted:{}->{}",
-            len, after_len
-        ));
+        if len - after_len > 0 {
+            println(format!(
+                "[connection]connection_list's gabage collacted:{}->{}",
+                len, after_len
+            ));
+        }
+
         thread::sleep(Duration::from_secs(12));
     }
 }
-fn get_idx(id: u16) -> usize {
-    let stats_r = STATS.read().unwrap();
-    for idx in 0..stats_r.connection_list.len() {
-        if stats_r.connection_list[idx].id == id {
-            return idx;
-        }
-    }
-    stats_r.connection_list.len()
-}
+
 pub fn init(stream: Arc<TcpStream>) -> Connection {
     *COUNT.lock().unwrap() += 1;
-    unsafe {
-        let key = key_agent::SECRET[0]
-            .public_key(&sign_util::SECP)
-            .to_string();
-        (&*stream)
-            .write_all(
-                format!(
-                    "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
-                    key
-                )
-                .as_bytes(),
+    let key = key_agent::SECRET
+        .get()
+        .unwrap()
+        .public_key(&sign_util::SECP)
+        .to_string();
+    (&*stream)
+        .write_all(
+            format!(
+                "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
+                key
             )
-            .unwrap();
-        (&*stream).flush().unwrap();
+            .as_bytes(),
+        )
+        .unwrap();
+    (&*stream).flush().unwrap();
 
-        println(format!(
-            "[connection]secret:{}\n[connection]sent pubk:{}",
-            key_agent::SECRET[0].display_secret(),
-            key
-        ))
-    }
+    println(format!(
+        "[connection]secret:{}\n[connection]sent pubk:{}",
+        key_agent::SECRET.get().unwrap().display_secret(),
+        key
+    ));
+
     Connection {
         id: *COUNT.lock().unwrap(),
         is_connected: true,

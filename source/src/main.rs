@@ -1,18 +1,15 @@
-use crate::mods::console::output::{eprintln, println};
+use crate::mods::console::output::println;
 use mods::block::block;
-use mods::block::block::read_block_from_local;
 use mods::certification::key_agent;
 use mods::certification::sign_util;
+use mods::config::config;
 use mods::network::connection;
 use mods::network::connection_listener;
 use mods::network::dns_seed;
-use once_cell::sync::Lazy;
 use std::io::stdin;
-use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
 
-use crate::mods::PoA::blockchain_manager;
+use crate::mods::poa::blockchain_manager;
 mod mods;
 /**
 
@@ -24,6 +21,7 @@ TODO: ノード間TLS通信<br />
 TODO: プロキシへの対応<br />
 */
 fn main() {
+    config::init();
     println(format!("[main]Initializing..."));
     key_agent::init();
     sign_util::init();
