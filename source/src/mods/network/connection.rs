@@ -30,12 +30,12 @@ pub struct ConnectionStats {
     pub connection_list: Vec<Connection>,
     pub count: u16,
 }
-pub static STATS: Lazy<RwLock<ConnectionStats>> = Lazy::new(|| {
+pub static STATS: RwLock<ConnectionStats> = {
     RwLock::new(ConnectionStats {
         connection_list: Vec::new(),
         count: 0,
     })
-});
+};
 pub struct Connection {
     pub is_connected: bool, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
     pub id: u16,

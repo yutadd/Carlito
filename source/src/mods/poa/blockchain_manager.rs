@@ -15,11 +15,9 @@ struct BlockChainStats {
     pub previous_generator: isize,
     //pub transaction_pool: Vec<JsonValue>,
 }
-static STATS: Lazy<Mutex<BlockChainStats>> = Lazy::new(|| {
-    Mutex::new(BlockChainStats {
-        previous_generator: -1,
-        //transaction_pool: Vec::new(),
-    })
+static STATS: Mutex<BlockChainStats> = Mutex::new(BlockChainStats {
+    previous_generator: -1,
+    //transaction_pool: Vec::new(),
 });
 pub fn set_previous_generator(index: isize) {
     println(format!(

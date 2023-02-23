@@ -1,5 +1,5 @@
 extern crate yaml_rust;
-use crate::mods::console::output::println;
+
 use once_cell::sync::OnceCell;
 use std::fs;
 use yaml_rust::{Yaml, YamlLoader};
@@ -14,6 +14,7 @@ pub fn init() {
 }
 #[test]
 fn config_init() {
+    use crate::mods::console::output::println;
     println(format!(
         "[config]unsafe config getter:{}",
         YAML.get().unwrap()["network"]["domain"].as_str().unwrap()

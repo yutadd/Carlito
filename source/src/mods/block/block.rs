@@ -24,7 +24,7 @@ use crate::mods::{certification::sign_util, transaction::transaction};
 pub static GENESIS_BLOCK_HASH: &str =
     "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D";
 pub static TX_PER_FILE: usize = 100;
-pub static BLOCKCHAIN: Lazy<RwLock<Vec<JsonValue>>> = Lazy::new(|| RwLock::new(Vec::new()));
+pub static BLOCKCHAIN: RwLock<Vec<JsonValue>> = RwLock::new(Vec::new());
 
 pub fn check(block: JsonValue, previous_hash: String) -> bool {
     println(format!("[block]dumped_full_block:{}", block.dump()));

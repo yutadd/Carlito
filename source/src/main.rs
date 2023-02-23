@@ -6,6 +6,7 @@ use mods::config::config;
 use mods::network::connection;
 use mods::network::connection_listener;
 use mods::network::dns_seed;
+
 use std::io::stdin;
 use std::thread;
 
