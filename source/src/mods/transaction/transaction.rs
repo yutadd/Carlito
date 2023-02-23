@@ -1,14 +1,8 @@
 use std::str::FromStr;
 
-use crate::mods::certification::{
-    key_agent,
-    sign_util::{self, create_sign, SECP},
-};
-use crate::mods::console::output::{eprintln, println};
-use base64::Engine;
-use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
+use crate::mods::certification::sign_util::{self};
 use json::{object, JsonValue};
-use secp256k1::{ecdsa::Signature, PublicKey, SecretKey};
+use secp256k1::PublicKey;
 
 pub fn check(transaction: JsonValue) -> bool {
     let transaction_without_sign = object![
@@ -29,6 +23,9 @@ pub fn check(transaction: JsonValue) -> bool {
 
 #[test]
 pub fn create_transaction() {
+    use crate::mods::certification::sign_util::create_sign;
+    use crate::mods::console::output::println;
+    use secp256k1::SecretKey;
     let mut example_transaction = object![
         author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
         date:1676449733,
