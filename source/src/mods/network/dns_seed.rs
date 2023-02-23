@@ -1,7 +1,6 @@
 #![feature(catch_expr)]
 use super::super::config::config;
 use super::connection;
-use super::connection::CONNECTION_LIST;
 use crate::mods::console::output::{eprintln, println, wprintln};
 use once_cell::sync::Lazy;
 use std::net::Ipv4Addr;
@@ -73,7 +72,11 @@ pub fn init() {
                 let mut _user2 = _user.clone();
                 thread::spawn(move || _user2.read_thread());
                 unsafe {
-                    CONNECTION_LIST.push(_user);
+                    connection::STATS
+                        .write()
+                        .unwrap()
+                        .connection_list
+                        .push(_user);
                 }
             }
             //↑dockerが同時に立ち上がり、listeningしていないときに接続を試みることを防ぐため、名前に合わせて数秒待つ
@@ -112,7 +115,11 @@ pub fn init() {
             let mut _user2 = _user.clone();
             thread::spawn(move || _user2.read_thread());
             unsafe {
-                CONNECTION_LIST.push(_user);
+                connection::STATS
+                    .write()
+                    .unwrap()
+                    .connection_list
+                    .push(_user);
             }
         }
     }

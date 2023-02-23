@@ -6,7 +6,7 @@ use crate::mods::certification::key_agent::SECRET;
 use crate::mods::certification::sign_util::{create_sign, SECP, TRUSTED_KEY};
 use crate::mods::config::config::YAML;
 use crate::mods::console::output::{eprintln, println};
-use crate::mods::network::connection::CONNECTION_LIST;
+use crate::mods::network::connection::Connection;
 use crate::mods::{
     certification::{key_agent, sign_util},
     network::connection,
@@ -51,7 +51,12 @@ pub fn block_generate() {
             } else {
                 next_index = 0;
             }
-            for c in CONNECTION_LIST.iter() {
+            for c in connection::STATS
+                .write()
+                .unwrap()
+                .connection_list
+                .iter_mut()
+            {
                 if BLOCKCHAIN.read().unwrap().len() > 0 {
                     c.write(format!(
                         "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
@@ -131,7 +136,12 @@ pub fn block_generate() {
                         next_index = 0;
                     }
                     println(format!("[blockchain_manager]next generator:{}", next_index));
-                    for c in CONNECTION_LIST.iter() {
+                    for c in connection::STATS
+                        .write()
+                        .unwrap()
+                        .connection_list
+                        .iter_mut()
+                    {
                         c.write(format!(
                             "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
                             block.dump()
