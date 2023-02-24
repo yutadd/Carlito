@@ -16,7 +16,7 @@ fn config_init() {
     use crate::mods::console::output::println;
     init();
     println(format!(
-        "[config]unsafe config getter:{}",
+        "[config]config getter:{}",
         YAML.get().unwrap()["network"]["domain"].as_str().unwrap()
     ));
 }

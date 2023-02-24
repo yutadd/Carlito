@@ -236,29 +236,7 @@ impl Connection {
         }
     }
 }
-/**pub fn is_all_connected() -> bool {
-    unsafe {
-        for tk in sign_util::TRUSTED_KEY.values() {
-            if !tk.eq(config::YAML["docker"]["own-pubk"].as_str().unwrap()) {
-                let mut aru = false;
-                for c in CONNECTION_LIST.iter() {
-                    if c.is_trusted {
-                        if c.pubk.unwrap().to_string().eq(tk) {
-                            aru = true;
-                            break;
-                        }
-                    }
-                }
-                if !aru {
-                    wprintln(format!("[connection]there are some not connected node"));
-                    wprintln(format!("[connection]not connected node:{}", tk));
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-}*/
+
 pub fn ovserve() {
     loop {
         let mut _stats = STATS.write().unwrap();

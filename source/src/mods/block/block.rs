@@ -130,18 +130,16 @@ pub fn read_block_from_local() {
         }
     }
     if last_block_height > 0 {
-        unsafe {
-            for i in 0..TRUSTED_KEY.read().unwrap().len() {
-                if TRUSTED_KEY
-                    .read()
-                    .unwrap()
-                    .get(&(i as isize))
-                    .unwrap()
-                    .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])
-                {
-                    set_previous_generator(i as isize);
-                    break;
-                }
+        for i in 0..TRUSTED_KEY.read().unwrap().len() {
+            if TRUSTED_KEY
+                .read()
+                .unwrap()
+                .get(&(i as isize))
+                .unwrap()
+                .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])
+            {
+                set_previous_generator(i as isize);
+                break;
             }
         }
     } else {
