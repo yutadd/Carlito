@@ -7,7 +7,10 @@ use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::poa::blockchain_manager::get_previous_generator;
 use crate::mods::poa::blockchain_manager::set_previous_generator;
-use once_cell::sync::Lazy;
+use crate::mods::transaction::transaction;
+use crate::mods::transaction::transaction::create_transaction;
+use base64::engine::general_purpose::STANDARD_NO_PAD;
+use base64::Engine;
 use rand::prelude::*;
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
@@ -16,7 +19,6 @@ use std::io::{BufRead, Write};
 use std::net::Shutdown;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
@@ -217,6 +219,39 @@ impl Connection {
                             "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
                             _blockchain[i].dump()
                         ));
+                    }
+                }
+            } else if json_obj["type"].eq("transaction") {
+                let transaction = json_obj["args"]["transaction"].clone();
+                let verify = transaction::check(&transaction);
+                if verify {
+                    println("[connection]verifying transaction success");
+                    if transaction["content_type"].as_str().unwrap().eq("layer_0") {
+                        let decoded_content = STANDARD_NO_PAD
+                            .decode(transaction["content_b64"].as_str().unwrap())
+                            .unwrap();
+                        let content = String::from_utf8(decoded_content).unwrap();
+                        let parsed_content = json::parse(&content).unwrap();
+                        println(format!(
+                            "[connection]received transaction content:{}",
+                            content
+                        ));
+                        if parsed_content["action"].to_string().eq("ping") {
+                            println("[connection]received ping");
+                            let transaction = create_transaction(
+                                "layer_0".to_string(),
+                                STANDARD_NO_PAD.encode("{\"action\":\"pong\"}".to_string()),
+                            )
+                            .unwrap();
+                            if transaction::check(&transaction) {
+                                self.write(format!(
+                                    "{{\"type\":\"transaction\",\"args\":{{\"transaction\":{}}}}}\r\n",
+                                    transaction.dump()
+                                ));
+                            }
+                        } else if parsed_content["action"].to_string().eq("pong") {
+                            println("[connection]received pong");
+                        }
                     }
                 }
             } else if json_obj["type"].eq("no_block") {

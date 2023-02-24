@@ -1,3 +1,4 @@
+use crate::mods::certification::key_agent::{self, SECRET};
 use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::poa::blockchain_manager::set_previous_generator;
 use json::{object, JsonValue};
@@ -13,7 +14,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::mods::certification::sign_util::TRUSTED_KEY;
+use crate::mods::certification::sign_util::{SECP, TRUSTED_KEY};
 use crate::mods::{certification::sign_util, transaction::transaction};
 
 /**
@@ -163,18 +164,24 @@ pub fn create_block() {
     use std::str::FromStr;
 
     use crate::mods::certification::sign_util::create_sign;
-
-    let example_transaction = object![
-        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
+    key_agent::init();
+    let mut example_transaction = object![
+        author:SECRET.get().unwrap().public_key(&SECP).to_string(),
         date:1676449733,
-        content_type:"c_asm".to_string(),
-        text_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
-        sign:"3045022100c1828dfa32d572a7e7f6682a4a311e83c110013a978fc180c6d8f14c9549c05602202549053f99e0bd109ddc965c4a6a41cc7e7c92eaff4fe9068d1d6f004a49757e"
+        content_type:"carlito_asm".to_string(),
+        content_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
     ];
+    let dumped_json = example_transaction.dump();
+    example_transaction
+        .insert(
+            "sign",
+            create_sign(dumped_json, *SECRET.get().unwrap()).to_string(),
+        )
+        .unwrap();
     let example_transactions = array![example_transaction];
     let mut example_block = object![
         previous_hash:"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D".to_string(),
-        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
+        author:SECRET.get().unwrap().public_key(&SECP).to_string(),
         date:1676449733,
         height:1,
         transactions:example_transactions,
