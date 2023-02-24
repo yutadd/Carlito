@@ -167,8 +167,9 @@ pub fn create_block() {
     let example_transaction = object![
         author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
         date:1676449733,
+        content_type:"c_asm".to_string(),
         text_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
-        sign:"304402207cd4924d4a95edf7d457bfad0ae5b7711e0c6ac7eb3087585dea80c743ae23d202205fe2b56c4aef3890fa7655566f8dd182ac16f1c4ffb7fb8a6f6c39eaa377dfda"
+        sign:"3045022100c1828dfa32d572a7e7f6682a4a311e83c110013a978fc180c6d8f14c9549c05602202549053f99e0bd109ddc965c4a6a41cc7e7c92eaff4fe9068d1d6f004a49757e"
     ];
     let example_transactions = array![example_transaction];
     let mut example_block = object![

@@ -4,7 +4,7 @@ use crate::mods::block::block;
 use crate::mods::block::block::check;
 use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
-use crate::mods::console::output::{println, wprintln};
+use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::poa::blockchain_manager::get_previous_generator;
 use crate::mods::poa::blockchain_manager::set_previous_generator;
 use once_cell::sync::Lazy;
@@ -66,7 +66,7 @@ impl Connection {
             let bytes = match reader.read_line(&mut line) {
                 Ok(o) => o,
                 Err(e) => {
-                    println(format!(
+                    eprintln(format!(
                         "[connection]error on reading input buffer:{}",
                         e.kind()
                     ));
@@ -189,9 +189,13 @@ impl Connection {
                         _block.push(json_obj["args"]["block"].clone());
                         println("[connection]New block pushed to my blockchain");
                     } else if check(json_obj["args"]["block"].clone(), "*".to_string()) {
-                        println(format!(
+                        wprintln(format!(
                                         "[connection]Received block is correct but it taller than my blockchain for 2 or more."
                                     ));
+                        self.write(format!(
+                            "{{\"type\":\"fetch\",\"args\":{{\"from\":{}}}}}\r\n",
+                            BLOCKCHAIN.read().unwrap().len()
+                        ));
                     } else {
                         wprintln(format!(
                             "[connection]Received block is taller than my block but not correct"
@@ -204,6 +208,17 @@ impl Connection {
                 }
 
                 *self.is_latest.write().unwrap() = true;
+            } else if json_obj["type"].eq("fetch") {
+                let request_index = json_obj["args"]["from"].as_usize().unwrap();
+                let _blockchain = BLOCKCHAIN.read().unwrap();
+                if request_index > _blockchain.len() {
+                    for i in 0.._blockchain.len() {
+                        self.write(format!(
+                            "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                            _blockchain[i].dump()
+                        ));
+                    }
+                }
             } else if json_obj["type"].eq("no_block") {
                 *self.is_latest.write().unwrap() = true;
             } else {

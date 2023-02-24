@@ -40,6 +40,8 @@ fn main() {
         let size = stdin().read_line(line).unwrap();
         if size > 0 {
             println(format!("[main]your input:{}", line));
+            
         }
+        
     }
 }
