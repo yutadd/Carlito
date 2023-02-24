@@ -40,7 +40,7 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         let mut any_invalid_ts = false;
         for t in block_without_sign["transactions"].members() {
             println(format!("[block]verifying transaction:{}", t));
-            if !transaction::check(t.clone()) {
+            if !transaction::check(&t.clone()) {
                 any_invalid_ts = true;
                 eprintln(format!("[block]invalid transaction:{}", t))
             } else {
