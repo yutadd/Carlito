@@ -45,7 +45,7 @@ fn read_key_from_file(file: File) {
     for line in reader.lines() {
         let line = line.unwrap();
         let key: SecretKey = SecretKey::from_str(&line).unwrap();
-        SECRET.set(key).unwrap();
+        SECRET.get_or_init(|| key);
     }
 }
 fn append_key_to_file(key: SecretKey) {
