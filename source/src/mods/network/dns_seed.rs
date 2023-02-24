@@ -13,6 +13,7 @@ use trust_dns_client::rr::{DNSClass, Name, RData, RecordType};
 use trust_dns_client::udp::UdpClientConnection;
 
 pub static CLIENT: Lazy<SyncClient<UdpClientConnection>> = Lazy::new(|| {
+    config::init();
     SyncClient::new(
         UdpClientConnection::new(
             format!(
@@ -79,15 +80,7 @@ pub fn init() {
                     continue;
                 }
             }
-
-            let _user = connection::init(Arc::new(connection));
-            let mut _user2 = _user.clone();
-            thread::spawn(move || _user2.read_thread());
-            connection::STATS
-                .write()
-                .unwrap()
-                .connection_list
-                .push(_user);
+            connection::init(Arc::new(connection));
         }
         //↑dockerが同時に立ち上がり、listeningしていないときに接続を試みることを防ぐため、名前に合わせて数秒待つ
     } else {
@@ -107,7 +100,6 @@ pub fn init() {
             {
                 continue;
             }
-
             let connection: TcpStream;
             match TcpStream::connect(format!("{}:{}", addr.to_string(), 7777)) {
                 Ok(stream) => {
@@ -118,15 +110,7 @@ pub fn init() {
                     continue;
                 }
             }
-
-            let mut _user = connection::init(Arc::new(connection));
-            let mut _user2 = _user.clone();
-            thread::spawn(move || _user2.read_thread());
-            connection::STATS
-                .write()
-                .unwrap()
-                .connection_list
-                .push(_user);
+            connection::init(Arc::new(connection));
         }
     }
 

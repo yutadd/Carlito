@@ -7,7 +7,9 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{prelude::*, BufReader};
 use std::str::FromStr;
-pub static mut TRUSTED_KEY: Lazy<HashMap<isize, String>> = Lazy::new(|| HashMap::new());
+use std::sync::RwLock;
+pub static TRUSTED_KEY: Lazy<RwLock<HashMap<isize, String>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 pub static SECP: Lazy<Secp256k1<All>> = Lazy::new(|| Secp256k1::new());
 pub fn init() {
     let file = OpenOptions::new()
@@ -18,15 +20,14 @@ pub fn init() {
         .unwrap();
     let reader = BufReader::new(file);
     let mut index = 0;
-    unsafe {
-        for line in reader.lines() {
-            let line = line.unwrap();
-            if line.trim().len() > 0 {
-                TRUSTED_KEY.insert(index, line);
-                index += 1;
-            }
+    for line in reader.lines() {
+        let line = line.unwrap();
+        if line.trim().len() > 0 {
+            TRUSTED_KEY.write().unwrap().insert(index, line);
+            index += 1;
         }
     }
+
     assert!(index > 0);
 }
 pub fn create_sign(original_message: String, secret_key: SecretKey) -> Signature {
@@ -47,21 +48,34 @@ pub fn verify_sign(original_message: String, sig: String, public_key: PublicKey)
 pub fn is_host_trusted(key: String) -> bool {
     let mut exists: bool = false;
     let mut vector_str = "".to_string();
-    unsafe {
-        println(format!("[sign_util]trusted_hosts:{}", TRUSTED_KEY.len()));
-        for i in 0..TRUSTED_KEY.len() {
-            vector_str = format!(
-                "{}{}{}",
-                vector_str,
-                TRUSTED_KEY.get(&(i as isize)).unwrap().as_str(),
-                "\n"
-            );
-            if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&key) {
-                exists = true;
-                break;
-            }
+    println(format!(
+        "[sign_util]trusted_hosts:{}",
+        TRUSTED_KEY.read().unwrap().len()
+    ));
+    for i in 0..TRUSTED_KEY.read().unwrap().len() {
+        vector_str = format!(
+            "{}{}{}",
+            vector_str,
+            TRUSTED_KEY
+                .read()
+                .unwrap()
+                .get(&(i as isize))
+                .unwrap()
+                .as_str(),
+            "\n"
+        );
+        if TRUSTED_KEY
+            .read()
+            .unwrap()
+            .get(&(i as isize))
+            .unwrap()
+            .eq(&key)
+        {
+            exists = true;
+            break;
         }
     }
+
     println(format!(
         "[sign_util]key:{} was {} on [{}]",
         key, exists, vector_str

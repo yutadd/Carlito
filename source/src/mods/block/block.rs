@@ -1,7 +1,6 @@
 use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::poa::blockchain_manager::set_previous_generator;
 use json::{object, JsonValue};
-use once_cell::sync::Lazy;
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
 use secp256k1::PublicKey;
@@ -132,8 +131,10 @@ pub fn read_block_from_local() {
     }
     if last_block_height > 0 {
         unsafe {
-            for i in 0..TRUSTED_KEY.len() {
+            for i in 0..TRUSTED_KEY.read().unwrap().len() {
                 if TRUSTED_KEY
+                    .read()
+                    .unwrap()
                     .get(&(i as isize))
                     .unwrap()
                     .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])

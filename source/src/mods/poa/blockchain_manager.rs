@@ -7,7 +7,6 @@ use crate::mods::console::output::println;
 use crate::mods::{certification::key_agent, network::connection};
 use chrono::{NaiveDateTime, Utc};
 use json::{array, object};
-use once_cell::sync::Lazy;
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
 #[derive(Clone)]
@@ -39,7 +38,7 @@ pub fn block_generate() {
         loop {
             let next_index;
             //信用リスト内部における次の生成者の添字を算出する
-            if get_previous_generator() < ((TRUSTED_KEY.len() - 1) as isize) {
+            if get_previous_generator() < ((TRUSTED_KEY.read().unwrap().len() - 1) as isize) {
                 next_index = get_previous_generator() + 1;
             } else {
                 next_index = 0;
@@ -60,11 +59,16 @@ pub fn block_generate() {
                 }
             }
             //算出された次の生成車は自分か
-            if TRUSTED_KEY.get(&next_index).unwrap().eq(&key_agent::SECRET
-                .get()
+            if TRUSTED_KEY
+                .read()
                 .unwrap()
-                .public_key(&SECP)
-                .to_string())
+                .get(&next_index)
+                .unwrap()
+                .eq(&key_agent::SECRET
+                    .get()
+                    .unwrap()
+                    .public_key(&SECP)
+                    .to_string())
             {
                 //一つ前のブロックが生成された時間から+10000ミリ秒以上過ぎているかもしくはブロックがまだ生成されていないか
                 if BLOCKCHAIN.read().unwrap().len() == 0
@@ -119,15 +123,22 @@ pub fn block_generate() {
                     assert!(check(block.clone(), previous));
                     println("[blockchain_manager]block generated successfully");
                     BLOCKCHAIN.write().unwrap().push(block.clone());
-                    for i in 0..TRUSTED_KEY.len() {
-                        if TRUSTED_KEY.get(&(i as isize)).unwrap().eq(&block["author"]) {
+                    for i in 0..TRUSTED_KEY.read().unwrap().len() {
+                        if TRUSTED_KEY
+                            .read()
+                            .unwrap()
+                            .get(&(i as isize))
+                            .unwrap()
+                            .eq(&block["author"])
+                        {
                             set_previous_generator(i as isize);
                             break;
                         }
                     }
                     //信用リスト内部における次の生成者の添字を算出する
                     let mut _next_index = -1;
-                    if get_previous_generator() < ((TRUSTED_KEY.len() - 1) as isize) {
+                    if get_previous_generator() < ((TRUSTED_KEY.read().unwrap().len() - 1) as isize)
+                    {
                         _next_index = get_previous_generator() + 1;
                     } else {
                         _next_index = 0;
@@ -153,7 +164,7 @@ pub fn block_generate() {
             } else {
                 println("[blockchain_manager]generator is not me this time");
                 let mut _next_index = -1;
-                if get_previous_generator() < ((TRUSTED_KEY.len() - 1) as isize) {
+                if get_previous_generator() < ((TRUSTED_KEY.read().unwrap().len() - 1) as isize) {
                     _next_index = get_previous_generator() + 1;
                 } else {
                     _next_index = 0;
