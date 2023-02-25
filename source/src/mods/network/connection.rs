@@ -4,19 +4,21 @@ use crate::mods::block::block;
 use crate::mods::block::block::check;
 use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
-use crate::mods::console::output::{println, wprintln};
-use crate::mods::poa::blockchain_manager::get_previous_generator;
-use crate::mods::poa::blockchain_manager::set_previous_generator;
-use once_cell::sync::Lazy;
+use crate::mods::console::output::{eprintln, println, wprintln};
+use crate::mods::poa::blockchain_manager;
+use crate::mods::transaction::transaction;
+use crate::mods::transaction::transaction::create_transaction;
+use base64::engine::general_purpose::STANDARD_NO_PAD;
+use base64::Engine;
 use rand::prelude::*;
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
 use secp256k1::PublicKey;
 use std::io::{BufRead, Write};
+use std::net::IpAddr;
 use std::net::Shutdown;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
@@ -43,6 +45,7 @@ pub struct Connection {
     pub pubk: Arc<RwLock<Option<PublicKey>>>,
     pub nonce: Arc<RwLock<Option<String>>>,
     pub is_latest: Arc<RwLock<bool>>,
+    pub addr: IpAddr, //固定
 }
 impl Clone for Connection {
     fn clone(&self) -> Connection {
@@ -54,6 +57,7 @@ impl Clone for Connection {
             pubk: self.pubk.clone(),
             nonce: self.nonce.clone(),
             is_latest: self.is_latest.clone(),
+            addr: self.addr.clone(),
         }
     }
 }
@@ -66,8 +70,9 @@ impl Connection {
             let bytes = match reader.read_line(&mut line) {
                 Ok(o) => o,
                 Err(e) => {
-                    println(format!(
-                        "[connection]error on reading input buffer:{}",
+                    eprintln(format!(
+                        "[connection{}]error on reading input buffer:{}",
+                        self.addr,
                         e.kind()
                     ));
                     break;
@@ -75,23 +80,30 @@ impl Connection {
             };
             if bytes == 0 || line.trim().len() == 0 {
                 *self.is_connected.write().unwrap() = false;
+                drop(&self.is_connected);
                 self.stream.shutdown(Shutdown::Both).unwrap();
                 break;
             }
-            println(format!("[connection]read_line{}", line));
             let json_obj = json::parse(&line).unwrap();
             if json_obj["type"].eq("hello") {
+                drop({
+                    let _id = self.id.read().unwrap();
+                    _id
+                });
                 println(format!(
-                    "[connection]received pubk is {}",
+                    "[connection{}]received pubk is {}",
+                    self.addr,
                     json_obj["args"]["pubk"].to_string()
                 ));
-                *self.pubk.write().unwrap() = Option::Some(
+                let mut _pubk = self.pubk.write().unwrap();
+                let pubk_copy = *_pubk.insert(
                     PublicKey::from_str(json_obj["args"]["pubk"].as_str().unwrap())
                         .unwrap()
                         .clone(),
                 );
+                drop(_pubk);
 
-                if sign_util::is_host_trusted(self.pubk.read().unwrap().unwrap().to_string()) {
+                if sign_util::is_host_trusted(pubk_copy.to_string()) {
                     let mut rng = rand::thread_rng();
                     let generated_rand = rng.next_u32();
                     self.write(format!(
@@ -99,13 +111,22 @@ impl Connection {
                         generated_rand
                     ));
 
-                    *self.nonce.write().unwrap() = Option::Some(format!("{}", generated_rand));
+                    let _ = *self
+                        .nonce
+                        .write()
+                        .unwrap()
+                        .insert(format!("{}", generated_rand));
                 } else {
                     wprintln(format!(
-                        "[connection]connection not trusted for wrong pubk."
+                        "[connection{}]connection not trusted for wrong pubk.",
+                        self.addr,
                     ));
                 }
             } else if json_obj["type"].eq("req_sign") {
+                drop({
+                    let _id = self.id.read().unwrap();
+                    _id
+                });
                 let sign = sign_util::create_sign(
                     json_obj["args"]["nonce"].as_str().unwrap().to_string(),
                     *key_agent::SECRET.get().unwrap(),
@@ -114,63 +135,96 @@ impl Connection {
                     "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
                     sign.to_string()
                 ));
-                println(format!("[connection]sign was sent"));
+                println(format!("[connection{}]sign was sent", self.addr,));
             } else if json_obj["type"].eq("signed") {
                 let verify_result;
+                let pubk_copy;
+                drop({
+                    let _id = self.id.read().unwrap();
+                    _id
+                });
+                drop({
+                    let _pubk = self.pubk.read().unwrap();
+                    pubk_copy = (*_pubk).unwrap().clone();
+                    _pubk
+                });
                 verify_result = sign_util::verify_sign(
                     self.nonce.read().unwrap().clone().unwrap(),
                     json_obj["args"]["sign"].as_str().unwrap().to_string(),
-                    self.pubk.read().unwrap().unwrap(),
+                    pubk_copy,
                 );
 
                 if verify_result {
-                    println(format!("[connection]verifying connection success"));
-                    *self.is_trusted.write().unwrap() = true;
                     println(format!(
-                        "[connection]is trusted:{}",
-                        self.is_trusted.read().unwrap().to_string()
+                        "[connection{}]verifying connection success",
+                        self.addr,
                     ));
+                    let mut _is_trusted = self.is_trusted.write().unwrap();
+                    *_is_trusted = true;
+                    println(format!(
+                        "[connection{}]is trusted:{}",
+                        self.addr,
+                        _is_trusted.to_string()
+                    ));
+                    drop(_is_trusted);
                     self.write("{\"type\":\"get_latest\"}\r\n".to_string());
-
                 //すべてのノードに最新のブロックを問い合わせて、最新状態に同期する。
                 } else {
-                    wprintln(format!("[connection]failed to verify this connection"));
+                    wprintln(format!(
+                        "[connection{}]failed to verify this connection",
+                        self.addr,
+                    ));
                 }
             } else if json_obj["type"].eq("get_latest") {
-                let _blockchain = BLOCKCHAIN.read().unwrap();
-                if _blockchain.len() > 0 {
+                let blockchain_copy;
+                drop({
+                    let _blockchain = BLOCKCHAIN.read().unwrap();
+                    blockchain_copy = (*_blockchain).clone();
+                    _blockchain
+                });
+                if blockchain_copy.len() > 0 {
                     self.write(format!(
                         "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
-                        _blockchain[_blockchain.len() - 1].dump()
+                        blockchain_copy[blockchain_copy.len() - 1].dump()
                     ));
                 } else {
                     self.write("{\"type\":\"no_block\"}\r\n".to_string());
                 }
             } else if json_obj["type"].eq("block") {
-                let mut _block = BLOCKCHAIN.write().unwrap();
-                println(format!("[connection]BLOCKCHAIN_LEN:{}", _block.len()));
-                println(format!(
-                    "[connection]received height:{}",
-                    json_obj["args"]["block"]["height"].as_usize().unwrap()
-                ));
-                if json_obj["args"]["block"]["height"].as_usize().unwrap() > _block.len() {
-                    let previous = match _block.len() > 0 {
+                let blockchain_copy;
+                {
+                    let _id = self.id.read().unwrap();
+                }
+                let trusted_copy;
+                {
+                    let _trusted = TRUSTED_KEY.read().unwrap();
+                    trusted_copy = (*_trusted).clone();
+                }
+                {
+                    let _blockchain = BLOCKCHAIN.read().unwrap();
+                    blockchain_copy = (*_blockchain).clone();
+                }
+                if json_obj["args"]["block"]["height"].as_usize().unwrap() > blockchain_copy.len() {
+                    let previous = match blockchain_copy.len() > 0 {
                         true => Message::from_hashed_data::<sha256::Hash>(
-                            _block[_block.len() - 1].dump().as_bytes(),
+                            blockchain_copy[blockchain_copy.len() - 1].dump().as_bytes(),
                         )
                         .to_string(),
                         false => block::GENESIS_BLOCK_HASH.to_string(),
                     };
                     if check(json_obj["args"]["block"].clone(), previous) {
                         println(format!(
-                            "[connection]Received block is correct and taller than my block"
+                            "[connection{}]Received block is correct and taller than my block",
+                            self.addr,
                         ));
-                        for i in 0..TRUSTED_KEY.read().unwrap().len() {
+                        for i in 0..trusted_copy.len() {
                             println(format!(
-                                "[connection]compare trusted_key:{} and {}",
-                                TRUSTED_KEY.read().unwrap().get(&(i as isize)).unwrap(),
+                                "[connection{}]compare trusted_key:{} and {}",
+                                self.addr,
+                                trusted_copy.get(&(i as isize)).unwrap(),
                                 &json_obj["args"]["block"]["author"].to_string()
                             ));
+                            let mut _stats = blockchain_manager::STATS.write().unwrap();
                             if TRUSTED_KEY
                                 .read()
                                 .unwrap()
@@ -178,36 +232,115 @@ impl Connection {
                                 .unwrap()
                                 .eq(&json_obj["args"]["block"]["author"].to_string())
                             {
-                                set_previous_generator(i as isize);
+                                _stats.previous_generator = i as isize;
                                 break;
                             }
+
+                            drop(_stats);
                         }
+
+                        let stats_copy;
+                        let _stats = blockchain_manager::STATS.read().unwrap();
+                        stats_copy = (*_stats).clone();
+                        drop(_stats);
                         println(format!(
-                            "[connection]previous_generator:{}",
-                            get_previous_generator()
+                            "[connection{}]previous_generator:{}",
+                            self.addr, stats_copy.previous_generator
                         ));
-                        _block.push(json_obj["args"]["block"].clone());
-                        println("[connection]New block pushed to my blockchain");
+                        {
+                            let mut _blockchain = BLOCKCHAIN.write().unwrap();
+                            _blockchain.push(json_obj["args"]["block"].clone());
+                            println(format!(
+                                "[connection{}]New block pushed to my blockchain",
+                                self.addr
+                            ));
+                        }
                     } else if check(json_obj["args"]["block"].clone(), "*".to_string()) {
-                        println(format!(
-                                        "[connection]Received block is correct but it taller than my blockchain for 2 or more."
+                        wprintln(format!(
+                                        "[connection{}]Received block is correct but it taller than my blockchain for 2 or more.",self.addr,
                                     ));
+                        self.write(format!(
+                            "{{\"type\":\"fetch\",\"args\":{{\"from\":{}}}}}\r\n",
+                            blockchain_copy.len()
+                        ));
+                        println(format!("[connection{}]sent fetch", self.addr,))
                     } else {
                         wprintln(format!(
-                            "[connection]Received block is taller than my block but not correct"
+                            "[connection{}]Received block is taller than my block but not correct",
+                            self.addr,
                         ));
                     }
                 } else {
                     wprintln(format!(
-                        "[connection]Received block is not taller than my block."
+                        "[connection{}]Received block is not taller than my block.",
+                        self.addr,
                     ));
                 }
 
                 *self.is_latest.write().unwrap() = true;
+            } else if json_obj["type"].eq("fetch") {
+                println("[connection]received fetch_request");
+                let request_index = json_obj["args"]["from"].as_usize().unwrap();
+                let blockchain_copy;
+                {
+                    let _blockchain = BLOCKCHAIN.read().unwrap();
+                    blockchain_copy = (*_blockchain).clone();
+                }
+                println("[connection]locked blockchain");
+                if request_index < blockchain_copy.len() {
+                    for i in request_index..blockchain_copy.len() {
+                        self.write(format!(
+                            "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
+                            blockchain_copy[i].dump()
+                        ));
+                    }
+                }
+                println("[connection]sent blockchain");
+            } else if json_obj["type"].eq("transaction") {
+                let transaction = json_obj["args"]["transaction"].clone();
+                let verify = transaction::check(&transaction);
+                if verify {
+                    println(format!(
+                        "[connection{}]verifying transaction success",
+                        self.addr
+                    ));
+                    if transaction["content_type"].as_str().unwrap().eq("layer_0") {
+                        let decoded_content = STANDARD_NO_PAD
+                            .decode(transaction["content_b64"].as_str().unwrap())
+                            .unwrap();
+                        let content = String::from_utf8(decoded_content).unwrap();
+                        let parsed_content = json::parse(&content).unwrap();
+                        {
+                            println(format!(
+                                "[connection{}]received transaction content:{}",
+                                self.addr, content
+                            ));
+                        }
+                        if parsed_content["action"].to_string().eq("ping") {
+                            println(format!("[connection{}]received ping", self.addr));
+                            let transaction = create_transaction(
+                                "layer_0".to_string(),
+                                STANDARD_NO_PAD.encode("{\"action\":\"pong\"}".to_string()),
+                            )
+                            .unwrap();
+                            if transaction::check(&transaction) {
+                                self.write(format!(
+                                    "{{\"type\":\"transaction\",\"args\":{{\"transaction\":{}}}}}\r\n",
+                                    transaction.dump()
+                                ));
+                            }
+                        } else if parsed_content["action"].to_string().eq("pong") {
+                            println(format!("[connection{}]received pong", self.addr));
+                        }
+                    }
+                }
             } else if json_obj["type"].eq("no_block") {
                 *self.is_latest.write().unwrap() = true;
             } else {
-                wprintln(format!("[connection]connection received unknown command"));
+                wprintln(format!(
+                    "[connection{}]connection received unknown command",
+                    self.addr,
+                ));
             }
         }
     }
@@ -216,7 +349,8 @@ impl Connection {
             match (&*self.stream).write_all(context.as_bytes()) {
                 Err(e) => {
                     println(format!(
-                        "[connection]connection aborted due to :{}",
+                        "[connection{}]connection aborted due to :{}",
+                        self.addr,
                         e.kind()
                     ));
                     *self.is_connected.write().unwrap() = false;
@@ -226,7 +360,8 @@ impl Connection {
             match (&*self.stream).flush() {
                 Err(e) => {
                     println(format!(
-                        "[connection]connection aborted due to :{}",
+                        "[connection{}]connection aborted due to :{}",
+                        self.addr,
                         e.kind()
                     ));
                     *self.is_connected.write().unwrap() = false;
@@ -236,18 +371,28 @@ impl Connection {
         }
     }
 }
-
 pub fn ovserve() {
     loop {
-        let mut _stats = STATS.write().unwrap();
-        let len = _stats.connection_list.len();
+        let _cl;
+        {
+            let _stats = STATS.read().unwrap();
+            _cl = _stats.connection_list.clone();
+        }
+
         let mut rem: Vec<usize> = Vec::new();
-        for i in 0.._stats.connection_list.len() {
-            if !*_stats.connection_list[i].is_connected.read().unwrap() {
+        for i in 0.._cl.len() {
+            if !*_cl[i].is_connected.read().unwrap() {
                 rem.push(i);
             }
         }
+        drop(_cl);
+        let mut _stats = STATS.write().unwrap();
+        let len = _stats.connection_list.len();
         for i in rem {
+            println(format!(
+                "[connection{}]was closed",
+                _stats.connection_list[i].addr
+            ));
             _stats.connection_list.remove(i);
         }
         let after_len = _stats.connection_list.len();
@@ -258,7 +403,6 @@ pub fn ovserve() {
                 len, after_len
             ));
         }
-
         thread::sleep(Duration::from_secs(12));
     }
 }
@@ -271,6 +415,7 @@ pub fn init(stream: Arc<TcpStream>) {
         .unwrap()
         .public_key(&sign_util::SECP)
         .to_string();
+    let ip = (&stream).peer_addr().unwrap().ip();
     let mut con = Connection {
         id: Arc::new(RwLock::new(_stats.count)),
         is_connected: Arc::new(RwLock::new(true)),
@@ -279,14 +424,16 @@ pub fn init(stream: Arc<TcpStream>) {
         pubk: Arc::new(RwLock::new(Option::None)),
         nonce: Arc::new(RwLock::new(Option::None)),
         is_latest: Arc::new(RwLock::new(false)),
+        addr: ip,
     };
     con.write(format!(
         "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
         key
     ));
     _stats.connection_list.push(con.clone());
+    drop(_stats);
     thread::spawn(move || con.read_thread());
-    println("[connection]inited connection instance");
+    println(format!("[connection{}]inited connection instance", ip));
 }
 #[test]
 fn parsing_json() {

@@ -49,7 +49,6 @@ fn get_addr(name: String) -> Vec<Ipv4Addr> {
             }
             Err(e) => {
                 eprintln(format!("[dns_seed]error on quering DNS:{}", e.kind()));
-                return Vec::new();
             }
         };
     }
@@ -118,6 +117,12 @@ pub fn init() {
 }
 #[test]
 fn dns_seed_fetch() {
-    let addrs = get_addr("amazon.com".to_string());
+    config::init();
+    let addrs = get_addr(
+        config::YAML.get().unwrap()["network"]["domain"]
+            .as_str()
+            .unwrap()
+            .to_string(),
+    );
     println(format!("[dns_seed]sum:{}", addrs.len()));
 }

@@ -1,5 +1,6 @@
+use crate::mods::certification::key_agent::{self, SECRET};
 use crate::mods::console::output::{eprintln, println, wprintln};
-use crate::mods::poa::blockchain_manager::set_previous_generator;
+use crate::mods::poa::blockchain_manager;
 use json::{object, JsonValue};
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
@@ -13,7 +14,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::mods::certification::sign_util::TRUSTED_KEY;
+use crate::mods::certification::sign_util::{SECP, TRUSTED_KEY};
 use crate::mods::{certification::sign_util, transaction::transaction};
 
 /**
@@ -34,13 +35,11 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         height:block["height"].to_string().parse::<usize>().unwrap(),
         transactions:block["transactions"].clone(),
     ];
-    if previous_hash.eq(&block["previous_hash"].to_string())
-        || block["previous_hash"].to_string().eq("*")
-    {
+    if previous_hash.eq(&block["previous_hash"].to_string()) || previous_hash.eq("*") {
         let mut any_invalid_ts = false;
         for t in block_without_sign["transactions"].members() {
             println(format!("[block]verifying transaction:{}", t));
-            if !transaction::check(t.clone()) {
+            if !transaction::check(&t.clone()) {
                 any_invalid_ts = true;
                 eprintln(format!("[block]invalid transaction:{}", t))
             } else {
@@ -129,6 +128,7 @@ pub fn read_block_from_local() {
             }
         }
     }
+    let mut _stats = blockchain_manager::STATS.write().unwrap();
     if last_block_height > 0 {
         for i in 0..TRUSTED_KEY.read().unwrap().len() {
             if TRUSTED_KEY
@@ -138,13 +138,14 @@ pub fn read_block_from_local() {
                 .unwrap()
                 .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])
             {
-                set_previous_generator(i as isize);
+                _stats.previous_generator = i as isize;
                 break;
             }
         }
     } else {
-        set_previous_generator(-1);
+        _stats.previous_generator = -1;
     }
+    drop(_stats);
     assert_eq!(get_index_and_line(last_block_height).0, i);
 }
 pub fn get_index_and_line(height: usize) -> (usize, usize) {
@@ -163,17 +164,24 @@ pub fn create_block() {
     use std::str::FromStr;
 
     use crate::mods::certification::sign_util::create_sign;
-
-    let example_transaction = object![
-        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
+    key_agent::init();
+    let mut example_transaction = object![
+        author:SECRET.get().unwrap().public_key(&SECP).to_string(),
         date:1676449733,
-        text_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
-        sign:"304402207cd4924d4a95edf7d457bfad0ae5b7711e0c6ac7eb3087585dea80c743ae23d202205fe2b56c4aef3890fa7655566f8dd182ac16f1c4ffb7fb8a6f6c39eaa377dfda"
+        content_type:"carlito_asm".to_string(),
+        content_b64:"QURERiBwYXRoL3RvL2ZpbGUgdXNlcjAx".to_string(),
     ];
+    let dumped_json = example_transaction.dump();
+    example_transaction
+        .insert(
+            "sign",
+            create_sign(dumped_json, *SECRET.get().unwrap()).to_string(),
+        )
+        .unwrap();
     let example_transactions = array![example_transaction];
     let mut example_block = object![
         previous_hash:"3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D".to_string(),
-        author:"02affab182d89e0ae1aa3e30e974b1ca55452f12f8e21d6e0125c47e689c614630".to_string(),
+        author:SECRET.get().unwrap().public_key(&SECP).to_string(),
         date:1676449733,
         height:1,
         transactions:example_transactions,
