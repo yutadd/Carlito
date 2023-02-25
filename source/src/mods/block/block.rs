@@ -36,7 +36,7 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         transactions:block["transactions"].clone(),
     ];
     if previous_hash.eq(&block["previous_hash"].to_string())
-        || block["previous_hash"].to_string().eq("*")
+        || previous_hash.eq("*")
     {
         let mut any_invalid_ts = false;
         for t in block_without_sign["transactions"].members() {
