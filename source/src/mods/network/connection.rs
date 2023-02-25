@@ -15,6 +15,7 @@ use secp256k1::hashes::sha256;
 use secp256k1::Message;
 use secp256k1::PublicKey;
 use std::io::{BufRead, Write};
+use std::net::IpAddr;
 use std::net::Shutdown;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -44,6 +45,7 @@ pub struct Connection {
     pub pubk: Arc<RwLock<Option<PublicKey>>>,
     pub nonce: Arc<RwLock<Option<String>>>,
     pub is_latest: Arc<RwLock<bool>>,
+    pub addr: IpAddr, //固定
 }
 impl Clone for Connection {
     fn clone(&self) -> Connection {
@@ -55,6 +57,7 @@ impl Clone for Connection {
             pubk: self.pubk.clone(),
             nonce: self.nonce.clone(),
             is_latest: self.is_latest.clone(),
+            addr: self.addr.clone(),
         }
     }
 }
@@ -69,7 +72,7 @@ impl Connection {
                 Err(e) => {
                     eprintln(format!(
                         "[connection{}]error on reading input buffer:{}",
-                        self.id.read().unwrap(),
+                        self.addr,
                         e.kind()
                     ));
                     break;
@@ -83,15 +86,13 @@ impl Connection {
             }
             let json_obj = json::parse(&line).unwrap();
             if json_obj["type"].eq("hello") {
-                let id_copy;
                 drop({
                     let _id = self.id.read().unwrap();
-                    id_copy = (*_id).clone();
                     _id
                 });
                 println(format!(
                     "[connection{}]received pubk is {}",
-                    id_copy,
+                    self.addr,
                     json_obj["args"]["pubk"].to_string()
                 ));
                 let mut _pubk = self.pubk.write().unwrap();
@@ -118,14 +119,12 @@ impl Connection {
                 } else {
                     wprintln(format!(
                         "[connection{}]connection not trusted for wrong pubk.",
-                        id_copy,
+                        self.addr,
                     ));
                 }
             } else if json_obj["type"].eq("req_sign") {
-                let id_copy;
                 drop({
                     let _id = self.id.read().unwrap();
-                    id_copy = (*_id).clone();
                     _id
                 });
                 let sign = sign_util::create_sign(
@@ -136,14 +135,12 @@ impl Connection {
                     "{{\"type\":\"signed\",\"args\":{{\"sign\":\"{}\"}}}}\r\n",
                     sign.to_string()
                 ));
-                println(format!("[connection{}]sign was sent", id_copy,));
+                println(format!("[connection{}]sign was sent", self.addr,));
             } else if json_obj["type"].eq("signed") {
                 let verify_result;
                 let pubk_copy;
-                let id_copy;
                 drop({
                     let _id = self.id.read().unwrap();
-                    id_copy = (*_id).clone();
                     _id
                 });
                 drop({
@@ -160,13 +157,13 @@ impl Connection {
                 if verify_result {
                     println(format!(
                         "[connection{}]verifying connection success",
-                        id_copy,
+                        self.addr,
                     ));
                     let mut _is_trusted = self.is_trusted.write().unwrap();
                     *_is_trusted = true;
                     println(format!(
                         "[connection{}]is trusted:{}",
-                        id_copy,
+                        self.addr,
                         _is_trusted.to_string()
                     ));
                     drop(_is_trusted);
@@ -175,7 +172,7 @@ impl Connection {
                 } else {
                     wprintln(format!(
                         "[connection{}]failed to verify this connection",
-                        self.id.read().unwrap(),
+                        self.addr,
                     ));
                 }
             } else if json_obj["type"].eq("get_latest") {
@@ -195,10 +192,8 @@ impl Connection {
                 }
             } else if json_obj["type"].eq("block") {
                 let blockchain_copy;
-                let id_copy;
                 {
                     let _id = self.id.read().unwrap();
-                    id_copy = (*_id).clone();
                 }
                 let trusted_copy;
                 {
@@ -220,12 +215,12 @@ impl Connection {
                     if check(json_obj["args"]["block"].clone(), previous) {
                         println(format!(
                             "[connection{}]Received block is correct and taller than my block",
-                            id_copy,
+                            self.addr,
                         ));
                         for i in 0..trusted_copy.len() {
                             println(format!(
                                 "[connection{}]compare trusted_key:{} and {}",
-                                id_copy,
+                                self.addr,
                                 trusted_copy.get(&(i as isize)).unwrap(),
                                 &json_obj["args"]["block"]["author"].to_string()
                             ));
@@ -250,35 +245,35 @@ impl Connection {
                         drop(_stats);
                         println(format!(
                             "[connection{}]previous_generator:{}",
-                            id_copy, stats_copy.previous_generator
+                            self.addr, stats_copy.previous_generator
                         ));
                         {
                             let mut _blockchain = BLOCKCHAIN.write().unwrap();
                             _blockchain.push(json_obj["args"]["block"].clone());
                             println(format!(
                                 "[connection{}]New block pushed to my blockchain",
-                                id_copy
+                                self.addr
                             ));
                         }
                     } else if check(json_obj["args"]["block"].clone(), "*".to_string()) {
                         wprintln(format!(
-                                        "[connection{}]Received block is correct but it taller than my blockchain for 2 or more.",id_copy,
+                                        "[connection{}]Received block is correct but it taller than my blockchain for 2 or more.",self.addr,
                                     ));
                         self.write(format!(
                             "{{\"type\":\"fetch\",\"args\":{{\"from\":{}}}}}\r\n",
                             blockchain_copy.len()
                         ));
-                        println(format!("[connection{}]sent fetch", id_copy,))
+                        println(format!("[connection{}]sent fetch", self.addr,))
                     } else {
                         wprintln(format!(
                             "[connection{}]Received block is taller than my block but not correct",
-                            id_copy,
+                            self.addr,
                         ));
                     }
                 } else {
                     wprintln(format!(
                         "[connection{}]Received block is not taller than my block.",
-                        id_copy,
+                        self.addr,
                     ));
                 }
 
@@ -305,7 +300,10 @@ impl Connection {
                 let transaction = json_obj["args"]["transaction"].clone();
                 let verify = transaction::check(&transaction);
                 if verify {
-                    println("[connection{}]verifying transaction success");
+                    println(format!(
+                        "[connection{}]verifying transaction success",
+                        self.addr
+                    ));
                     if transaction["content_type"].as_str().unwrap().eq("layer_0") {
                         let decoded_content = STANDARD_NO_PAD
                             .decode(transaction["content_b64"].as_str().unwrap())
@@ -315,12 +313,11 @@ impl Connection {
                         {
                             println(format!(
                                 "[connection{}]received transaction content:{}",
-                                self.id.read().unwrap(),
-                                content
+                                self.addr, content
                             ));
                         }
                         if parsed_content["action"].to_string().eq("ping") {
-                            println("[connection{}]received ping");
+                            println(format!("[connection{}]received ping", self.addr));
                             let transaction = create_transaction(
                                 "layer_0".to_string(),
                                 STANDARD_NO_PAD.encode("{\"action\":\"pong\"}".to_string()),
@@ -333,7 +330,7 @@ impl Connection {
                                 ));
                             }
                         } else if parsed_content["action"].to_string().eq("pong") {
-                            println("[connection{}]received pong");
+                            println(format!("[connection{}]received pong", self.addr));
                         }
                     }
                 }
@@ -342,7 +339,7 @@ impl Connection {
             } else {
                 wprintln(format!(
                     "[connection{}]connection received unknown command",
-                    self.id.read().unwrap(),
+                    self.addr,
                 ));
             }
         }
@@ -353,7 +350,7 @@ impl Connection {
                 Err(e) => {
                     println(format!(
                         "[connection{}]connection aborted due to :{}",
-                        self.id.read().unwrap(),
+                        self.addr,
                         e.kind()
                     ));
                     *self.is_connected.write().unwrap() = false;
@@ -364,7 +361,7 @@ impl Connection {
                 Err(e) => {
                     println(format!(
                         "[connection{}]connection aborted due to :{}",
-                        self.id.read().unwrap(),
+                        self.addr,
                         e.kind()
                     ));
                     *self.is_connected.write().unwrap() = false;
@@ -376,18 +373,25 @@ impl Connection {
 }
 pub fn ovserve() {
     loop {
-        let mut _stats = STATS.write().unwrap();
-        let len = _stats.connection_list.len();
+        let _cl;
+        {
+            let _stats = STATS.read().unwrap();
+            _cl = _stats.connection_list.clone();
+        }
+
         let mut rem: Vec<usize> = Vec::new();
-        for i in 0.._stats.connection_list.len() {
-            if !*_stats.connection_list[i].is_connected.read().unwrap() {
+        for i in 0.._cl.len() {
+            if !*_cl[i].is_connected.read().unwrap() {
                 rem.push(i);
             }
         }
+        drop(_cl);
+        let mut _stats = STATS.write().unwrap();
+        let len = _stats.connection_list.len();
         for i in rem {
             println(format!(
                 "[connection{}]was closed",
-                _stats.connection_list[i].id.read().unwrap()
+                _stats.connection_list[i].addr
             ));
             _stats.connection_list.remove(i);
         }
@@ -411,6 +415,7 @@ pub fn init(stream: Arc<TcpStream>) {
         .unwrap()
         .public_key(&sign_util::SECP)
         .to_string();
+    let ip = (&stream).peer_addr().unwrap().ip();
     let mut con = Connection {
         id: Arc::new(RwLock::new(_stats.count)),
         is_connected: Arc::new(RwLock::new(true)),
@@ -419,6 +424,7 @@ pub fn init(stream: Arc<TcpStream>) {
         pubk: Arc::new(RwLock::new(Option::None)),
         nonce: Arc::new(RwLock::new(Option::None)),
         is_latest: Arc::new(RwLock::new(false)),
+        addr: ip,
     };
     con.write(format!(
         "{{\"type\":\"hello\",\"args\":{{\"pubk\":\"{}\"}}}}\r\n",
@@ -427,7 +433,7 @@ pub fn init(stream: Arc<TcpStream>) {
     _stats.connection_list.push(con.clone());
     drop(_stats);
     thread::spawn(move || con.read_thread());
-    println("[connection{}]inited connection instance");
+    println(format!("[connection{}]inited connection instance", ip));
 }
 #[test]
 fn parsing_json() {

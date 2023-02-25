@@ -48,10 +48,10 @@ pub fn block_generate() {
         let mut _stats = connection::STATS.write().unwrap();
         for c in _stats.connection_list.iter_mut() {
             if blockchain_copy.len() > 0 {
-                c.write(format!(
+                /*  c.write(format!(
                     "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
                     blockchain_copy[blockchain_copy.len() - 1].dump()
-                ));
+                ));*/
             } else {
                 println("[blockchain_manager]block not generated yet")
             }
