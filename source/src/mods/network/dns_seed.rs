@@ -49,7 +49,6 @@ fn get_addr(name: String) -> Vec<Ipv4Addr> {
             }
             Err(e) => {
                 eprintln(format!("[dns_seed]error on quering DNS:{}", e.kind()));
-                return Vec::new();
             }
         };
     }

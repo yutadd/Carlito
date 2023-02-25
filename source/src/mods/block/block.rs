@@ -1,6 +1,6 @@
 use crate::mods::certification::key_agent::{self, SECRET};
 use crate::mods::console::output::{eprintln, println, wprintln};
-use crate::mods::poa::blockchain_manager::set_previous_generator;
+use crate::mods::poa::blockchain_manager;
 use json::{object, JsonValue};
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
@@ -35,9 +35,7 @@ pub fn check(block: JsonValue, previous_hash: String) -> bool {
         height:block["height"].to_string().parse::<usize>().unwrap(),
         transactions:block["transactions"].clone(),
     ];
-    if previous_hash.eq(&block["previous_hash"].to_string())
-        || previous_hash.eq("*")
-    {
+    if previous_hash.eq(&block["previous_hash"].to_string()) || previous_hash.eq("*") {
         let mut any_invalid_ts = false;
         for t in block_without_sign["transactions"].members() {
             println(format!("[block]verifying transaction:{}", t));
@@ -130,6 +128,7 @@ pub fn read_block_from_local() {
             }
         }
     }
+    let mut _stats = blockchain_manager::STATS.write().unwrap();
     if last_block_height > 0 {
         for i in 0..TRUSTED_KEY.read().unwrap().len() {
             if TRUSTED_KEY
@@ -139,13 +138,14 @@ pub fn read_block_from_local() {
                 .unwrap()
                 .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])
             {
-                set_previous_generator(i as isize);
+                _stats.previous_generator = i as isize;
                 break;
             }
         }
     } else {
-        set_previous_generator(-1);
+        _stats.previous_generator = -1;
     }
+    drop(_stats);
     assert_eq!(get_index_and_line(last_block_height).0, i);
 }
 pub fn get_index_and_line(height: usize) -> (usize, usize) {
