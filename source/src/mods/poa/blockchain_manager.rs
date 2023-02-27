@@ -1,38 +1,37 @@
 use std::sync::RwLock;
 use std::{sync::Mutex, thread, time::Duration};
 
-use crate::mods::block::block::{self, check, BLOCKCHAIN};
+use crate::mods::block::block::{self, check};
 use crate::mods::certification::key_agent::SECRET;
 use crate::mods::certification::sign_util::{create_sign, SECP, TRUSTED_KEY};
 use crate::mods::console::output::println;
 use crate::mods::{certification::key_agent, network::connection};
 use chrono::{NaiveDateTime, Utc};
-use json::{array, object};
+use json::{array, object, JsonValue};
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
 #[derive(Clone)]
 pub struct BlockChainStats {
     pub previous_generator: isize,
-    //pub transaction_pool: Vec<JsonValue>,
+    pub transaction_pool: Vec<JsonValue>,
+    pub blockchain: Vec<JsonValue>,
 }
 pub static STATS: RwLock<BlockChainStats> = RwLock::new(BlockChainStats {
     previous_generator: -1,
-    //transaction_pool: Vec::new(),
+    transaction_pool: Vec::new(),
+    blockchain: Vec::new(),
 });
-
+pub static GENESIS_BLOCK_HASH: &str =
+    "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D";
 pub fn block_generate() {
     loop {
         let next_index;
-        let mut stats_copy;
+        let stats_copy;
         {
             let _stats = STATS.read().unwrap();
             stats_copy = (*_stats).clone();
         }
-        let blockchain_copy;
-        {
-            let _blockchain = BLOCKCHAIN.read().unwrap();
-            blockchain_copy = (*_blockchain).clone();
-        }
+        let blockchain_copy = stats_copy.blockchain.clone();
 
         let trusted_copy;
         {
@@ -44,19 +43,7 @@ pub fn block_generate() {
         } else {
             next_index = 0;
         }
-        //信用リスト内部における次の生成者の添字を算出する
-        let mut _stats = connection::STATS.write().unwrap();
-        for c in _stats.connection_list.iter_mut() {
-            if blockchain_copy.len() > 0 {
-                /*  c.write(format!(
-                    "{{\"type\":\"block\",\"args\":{{\"block\":{}}}}}\r\n",
-                    blockchain_copy[blockchain_copy.len() - 1].dump()
-                ));*/
-            } else {
-                println("[blockchain_manager]block not generated yet")
-            }
-        }
-        drop(_stats);
+        drop(stats_copy);
         //算出された次の生成車は自分か
         if trusted_copy.get(&next_index).unwrap().eq(&key_agent::SECRET
             .get()
@@ -93,7 +80,7 @@ pub fn block_generate() {
                     )
                     .to_string()
                 } else {
-                    previous = block::GENESIS_BLOCK_HASH.to_string();
+                    previous = GENESIS_BLOCK_HASH.to_string();
                 }
                 let mut block = object![//ブロック生成
                     previous_hash:previous.clone(),
@@ -110,10 +97,9 @@ pub fn block_generate() {
                     .unwrap();
                 assert!(check(block.clone(), previous));
                 println("[blockchain_manager]block generated successfully");
-                let mut _blockchain = BLOCKCHAIN.write().unwrap();
-                _blockchain.push(block.clone());
-                drop(_blockchain);
+
                 let mut _stats = STATS.write().unwrap();
+                _stats.blockchain.push(block.clone());
                 for i in 0..trusted_copy.len() {
                     if trusted_copy
                         .get(&(i as isize))
@@ -124,9 +110,13 @@ pub fn block_generate() {
                         break;
                     }
                 }
-                stats_copy = (*_stats).clone();
                 drop(_stats);
                 //信用リスト内部における次の生成者の添字を算出する
+                let stats_copy;
+                {
+                    let _stats = STATS.read().unwrap();
+                    stats_copy = (*_stats).clone();
+                }
                 let mut _next_index = -1;
                 if stats_copy.previous_generator < ((trusted_copy.len() - 1) as isize) {
                     _next_index = stats_copy.previous_generator + 1;
@@ -154,6 +144,11 @@ pub fn block_generate() {
         } else {
             println("[blockchain_manager]generator is not me this time");
             let mut _next_index = -1;
+            let stats_copy;
+            {
+                let _stats = STATS.read().unwrap();
+                stats_copy = (*_stats).clone();
+            }
             if stats_copy.previous_generator < ((trusted_copy.len() - 1) as isize) {
                 _next_index = stats_copy.previous_generator + 1;
             } else {

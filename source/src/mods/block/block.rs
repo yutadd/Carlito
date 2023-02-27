@@ -1,6 +1,6 @@
 use crate::mods::certification::key_agent::{self, SECRET};
 use crate::mods::console::output::{eprintln, println, wprintln};
-use crate::mods::poa::blockchain_manager;
+use crate::mods::poa::blockchain_manager::{self, GENESIS_BLOCK_HASH, STATS};
 use json::{object, JsonValue};
 use secp256k1::hashes::sha256;
 use secp256k1::Message;
@@ -21,10 +21,8 @@ use crate::mods::{certification::sign_util, transaction::transaction};
  * /Blocks/に最低１ブロックはなければならない。
  *
 */
-pub static GENESIS_BLOCK_HASH: &str =
-    "3F6D388DB566932F70F35D15D9FA88822F40075BDAAA370CCB40536D2FC18C3D";
+
 pub static TX_PER_FILE: usize = 100;
-pub static BLOCKCHAIN: RwLock<Vec<JsonValue>> = RwLock::new(Vec::new());
 
 pub fn check(block: JsonValue, previous_hash: String) -> bool {
     println(format!("[block]dumped_full_block:{}", block.dump()));
@@ -124,7 +122,7 @@ pub fn read_block_from_local() {
                 previous = hash.to_string();
                 last_block_height = _block["height"].as_usize().unwrap();
                 println(format!("[block]height:{}", last_block_height));
-                BLOCKCHAIN.write().unwrap().push(_block);
+                STATS.write().unwrap().blockchain.push(_block);
             }
         }
     }
@@ -136,7 +134,7 @@ pub fn read_block_from_local() {
                 .unwrap()
                 .get(&(i as isize))
                 .unwrap()
-                .eq(&BLOCKCHAIN.read().unwrap()[BLOCKCHAIN.read().unwrap().len() - 1]["author"])
+                .eq(&_stats.blockchain[_stats.blockchain.len() - 1]["author"])
             {
                 _stats.previous_generator = i as isize;
                 break;

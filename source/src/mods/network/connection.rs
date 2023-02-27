@@ -1,11 +1,10 @@
 use super::super::certification::key_agent;
 use super::super::certification::sign_util;
-use crate::mods::block::block;
 use crate::mods::block::block::check;
-use crate::mods::block::block::BLOCKCHAIN;
 use crate::mods::certification::sign_util::TRUSTED_KEY;
 use crate::mods::console::output::{eprintln, println, wprintln};
 use crate::mods::poa::blockchain_manager;
+use crate::mods::poa::blockchain_manager::GENESIS_BLOCK_HASH;
 use crate::mods::transaction::transaction;
 use crate::mods::transaction::transaction::create_transaction;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
@@ -39,7 +38,7 @@ pub static STATS: RwLock<ConnectionStats> = {
 pub struct Connection {
     //クローン後も同じ値を参照するためにスマートポインタを使う必要がある機がする。
     pub is_connected: Arc<RwLock<bool>>, //処理中などにノードが使用不可になったことを判定できるようにisokは必要
-    pub id: Arc<RwLock<u16>>,
+    pub id: Arc<RwLock<u16>>,            //代入するためにはRwLockが必要
     pub stream: Arc<TcpStream>,
     pub is_trusted: Arc<RwLock<bool>>,
     pub pubk: Arc<RwLock<Option<PublicKey>>>,
@@ -178,9 +177,9 @@ impl Connection {
             } else if json_obj["type"].eq("get_latest") {
                 let blockchain_copy;
                 drop({
-                    let _blockchain = BLOCKCHAIN.read().unwrap();
-                    blockchain_copy = (*_blockchain).clone();
-                    _blockchain
+                    let _stats = blockchain_manager::STATS.read().unwrap();
+                    blockchain_copy = (_stats.blockchain).clone();
+                    _stats
                 });
                 if blockchain_copy.len() > 0 {
                     self.write(format!(
@@ -192,17 +191,15 @@ impl Connection {
                 }
             } else if json_obj["type"].eq("block") {
                 let blockchain_copy;
-                {
-                    let _id = self.id.read().unwrap();
-                }
+
                 let trusted_copy;
                 {
                     let _trusted = TRUSTED_KEY.read().unwrap();
                     trusted_copy = (*_trusted).clone();
                 }
                 {
-                    let _blockchain = BLOCKCHAIN.read().unwrap();
-                    blockchain_copy = (*_blockchain).clone();
+                    let _blockchain = blockchain_manager::STATS.read().unwrap();
+                    blockchain_copy = _blockchain.blockchain.clone();
                 }
                 if json_obj["args"]["block"]["height"].as_usize().unwrap() > blockchain_copy.len() {
                     let previous = match blockchain_copy.len() > 0 {
@@ -210,7 +207,7 @@ impl Connection {
                             blockchain_copy[blockchain_copy.len() - 1].dump().as_bytes(),
                         )
                         .to_string(),
-                        false => block::GENESIS_BLOCK_HASH.to_string(),
+                        false => GENESIS_BLOCK_HASH.to_string(),
                     };
                     if check(json_obj["args"]["block"].clone(), previous) {
                         println(format!(
@@ -248,7 +245,7 @@ impl Connection {
                             self.addr, stats_copy.previous_generator
                         ));
                         {
-                            let mut _blockchain = BLOCKCHAIN.write().unwrap();
+                            let mut _blockchain = stats_copy.blockchain;
                             _blockchain.push(json_obj["args"]["block"].clone());
                             println(format!(
                                 "[connection{}]New block pushed to my blockchain",
@@ -283,8 +280,8 @@ impl Connection {
                 let request_index = json_obj["args"]["from"].as_usize().unwrap();
                 let blockchain_copy;
                 {
-                    let _blockchain = BLOCKCHAIN.read().unwrap();
-                    blockchain_copy = (*_blockchain).clone();
+                    let _blockchain = blockchain_manager::STATS.read().unwrap();
+                    blockchain_copy = (*_blockchain).blockchain.clone();
                 }
                 println("[connection]locked blockchain");
                 if request_index < blockchain_copy.len() {
